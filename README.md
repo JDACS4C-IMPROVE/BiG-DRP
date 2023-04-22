@@ -1,59 +1,72 @@
-# BiG-DRP: Bipartite Graph-based Drug Response Predictor
+# BiG-DRP Data Preprocessing
 
-Implementation of Bipartite Graph-represented Drug Response Predictor (BiG-DRP and BiG-DRP+) as described in:
+Here are the steps to process the GDSC data used by BiG-DRP
 
->David Earl Hostallero, Yihui Li, Amin Emad, Looking at the BiG picture: incorporating bipartite graphs in drug response prediction, Bioinformatics, Volume 38, Issue 14, 15 July 2022, Pages 3609–3620, https://doi.org/10.1093/bioinformatics/btac383
+## Step 1: Download and format the data
 
-## Dependencies
-This repository has been tested on python 3.7. To install the dependencies run the following on the terminal
-```
-pip install -r requirements.txt
-```
+1. Download the Drug Response data here: https://www.cancerrxgene.org/gdsc1000/GDSC1000_WebResources/Home.html
+	- TableS4A.xlsx
+	- TableS5C.xlsx
 
-## Running BiG-DRP
-```
-python main.py
-```
+2. Copy the TableS4A and remove all formatting and merged columns. Save into a csv file "ln_ic50.csv". 
+	This could be done easily by copying A6:JG996 into a fresh spreadsheed then saving as csv.
+	The following should be the headers:
+	
+|  cosmic_id| sample_names  | drug1 | ... | drugN  |
+|---|---|---|---|---|
+|  |   |   |   |   |
+|  |   |   |   |   |
 
-## Running BiG-DRP+
-To run BiG-DRP+, you must first run BiG-DRP while specifying the results subfolder (`--folder=<folder_name>`). Then run BiG-DRP with the `--weight_folder` specified as the results subfolder in the previous run.
-```
-python main.py --mode=train --folder=big
-python main.py --mode=extra --weight_folder=big --folder=big_plus
-```
+3. Copy the TableS5C and remove all formatting and merged columns. Save into a csv file "binary_response.csv".  This could be done easily by copying B6:JG1008 into a fresh spreadsheed then saving as csv. The following should be the headers (and first row):
 
-## Additional Parameters
+|  compounds| drug1  | drug2 | ... | drugN  |
+|---|---|---|---|---|
+| threshold |  |  |  |  |
+| CCL1 |   |   |   |   |
+| CCL2 |   |   |   |   |
 
-- `--split`: the type of data-splitting to use (`lco` or `lpo`, default: `lco`)
-- `--dataroot`: the root directory of your data (file names for input files can me modified in `utils/constants.py`) (default: `../`)
-- `--outroot`: the root directory of your outputs (default: `./`)
-- `--folder`: subdirectory you want to save your outputs (optional)
-- `--weight_folder`: subdirectory for the saved weights and encodings (for BiG-DRP+ only)
-- `--mode`: `train` means BiG-DRP, `extra` means BiG-DRP+ (default: `train`)
-- `--seed`: the seed number for 5-fold CV (default: 0)
-- `--drug_feat`: type of drug feature (`desc`, `morgan`, or `mixed`, default: `desc`)
-- `--network_perc`: percentile used for the bipartite graph threshold (default: 1)
+5. Download the RNASeq gene expression (in FPKM) and genefrom Cell Model Passports: https://cellmodelpassports.sanger.ac.uk/downloads
 
-## Data Availability
-Preprocessed data can be accessed here: https://dx.doi.org/10.6084/m9.figshare.20022947
 
-## Performance Metrics
-Note that when you run ``main.py``, the output performance metrics do not correspond to the ones we presented in the paper because ``main.py`` only shows the overall performance (i.e. performance for all (drug, CCL) pairs in the test set is calculated as a whole). In the paper, we calculated the performance **per drug then averaged the per-drug performances**. To run the per-drug calculation, use ``metrics/calculate_metrics.py``. Example:
+## Step 2: Process the gene expression
+Open the gdsc_sanger_preprocessing.ipynb, replace the filenames as needed, then run everything
+
+
+## Step 3: Process the labels
+Set the appropriate filenames in `label_preprocessing.py`, then run on terminal:
 
 ```
-python metrics/calculate_metrics.py --folder=results/big_plus/ --outfolder=results/big_plus
+python label_preprocessing.py
 ```
 
-## BibTex Citation
+
+## Step 4: Get the drug features
+
+1. If you do not have the SMILES, run the following:
+
 ```
-@article{hostallero2022looking,
-  title={Looking at the BiG picture: incorporating bipartite graphs in drug response prediction},
-  author={Hostallero, David Earl and Li, Yihui and Emad, Amin},
-  journal={Bioinformatics},
-  volume={38},
-  number={14},
-  pages={3609--3620},
-  year={2022},
-  publisher={Oxford University Press}
-}
+python graph_scripts/get_drug_smiles.py
+```
+
+2. (1) might not be enough. Manually, add some of the SMILES. The SMILES we used are already in the supplementary folder.
+
+3. To get the morgan fingerprints:
+
+```
+python get_drug_morgan_fingerprint.py
+```
+
+4. To get the drug descriptors:
+
+```
+python get_drug_descriptors.py
+```
+
+
+## Step 5: Split the data
+
+run:
+
+```
+python data_splits.py
 ```

@@ -1,0 +1,27 @@
+[Global_Params]
+model_name = 'BiG-DRP'
+rnaseq_fpkm = "data/DB_Sanger/old/rnaseq_20191101/rnaseq_fpkm_20191101.csv"
+gene_identifiers = 'data/DB_Sanger/old/rnaseq_20191101/gene_identifiers_20191101.csv'
+enst_list = 'data/preprocessed/enst.list'
+dataroot="/homes/ac.rgnanaolivu/improve_data_dir/BiG-DRP/"
+drug_synonyms = 'data/supplementary/drug_synonyms.csv'
+lnic50_file = 'data/DB_Sanger/ln_ic50.csv'
+smiles_file = 'data/supplementary/gdsc_drugs_smiles_250_manual.csv'
+binary_file = "data/DB_Sanger/binary_response.csv"
+fpkm_file = 'data/preprocessed/sanger_fpkm.csv'
+tcga_file = 'data/supplementary/tcga_one_sample.csv'
+learning_rate = 0.0001
+batch_size = 128
+epochs = 50
+cuda_name = 'cuda:0'
+output_dir = 'results'
+network_percentile = 1
+drug_feature = 'desc'
+split = "lco"
+mode = "train"
+seed = 0
+outroot = "NOTEBOOK/"
+results_dir = 'NOTEBOOK/results'
+weight_folder = ""
+normalize_response = "True"
+folder = ""

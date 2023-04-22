@@ -3,3 +3,7 @@
 *__pycache__
 data/
 results/
+*.ipynb
+.ipynb_checkpoints/
+Data/
+supplementary/
