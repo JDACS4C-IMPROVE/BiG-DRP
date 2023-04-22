@@ -11,7 +11,7 @@ parser.add_argument('-o', '--outfolder', default='results/', help='output folder
 parser.add_argument('-d', '--drugset', default='metrics/lists/drug_list.txt', help='file containing the list of drugs')
 parser.add_argument('-r', '--response', default='ln_ic50', help='[ln_ic50], auc')
 parser.add_argument('-m', '--mode', default='collate', help='[collate], per_fold')
-parser.add_argument('-l', '--labels', default='../../drp-data/grl-preprocessed/drug_response/gdsc_tuple_labels_folds.csv', help='labels and folds file')
+parser.add_argument('-l', '--labels', default='Data/drp-data/grl-preprocessed/drug_response/gdsc_tuple_labels_folds.csv', help='labels and folds file')
 args = parser.parse_args() 
 
 folder = args.folder

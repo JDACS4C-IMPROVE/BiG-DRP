@@ -2,7 +2,7 @@ from utils.tuple_dataset import TupleMatrixDataset
 from utils.utils import mkdir, reindex_tuples, moving_average, reset_seed, create_fold_mask
 from utils.network_gen import create_network
 from utils.data_initializer import initialize
-
+from argparse import Namespace
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 from bigdrp.trainer import Trainer
@@ -110,12 +110,13 @@ def create_dataset(tuples, train_x, val_x,
 
     return network, train_data, val_data, cell_lines, drug_feats
 
-def nested_cross_validation(FLAGS, drug_feats, cell_lines, labels, label_matrix, normalizer):
+def nested_cross_validation(FLAGS, drug_feats, cell_lines, labels,
+                            label_matrix, normalizer, learning_rate, epoch, batch_size):
     reset_seed(FLAGS.seed)
     hyperparams = {
-        'learning_rate': 1e-4,
-        'num_epoch': 50,
-        'batch_size': 128,
+        'learning_rate': learning_rate,
+        'num_epoch': epoch,
+        'batch_size': batch_size,
         'common_dim': 512,
         'expr_enc': 1024,
         'conv1': 512,
@@ -230,10 +231,12 @@ def nested_cross_validation(FLAGS, drug_feats, cell_lines, labels, label_matrix,
     
     return final_metrics
 
-def main(FLAGS):
-    print(FLAGS)
+def main(params, learning_rate, epoch, batch_size):
+    ns = Namespace(**params)
+    FLAGS = ns
     drug_feats, cell_lines, labels, label_matrix, normalizer = initialize(FLAGS)
-    test_metrics = nested_cross_validation(FLAGS, drug_feats, cell_lines, labels, label_matrix, normalizer)
+    test_metrics = nested_cross_validation(FLAGS, drug_feats, cell_lines, labels,
+                                           label_matrix, normalizer, learning_rate, epoch, batch_size)
     test_metrics = test_metrics.mean(axis=0)
 
     print("Overall Performance")
