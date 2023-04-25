@@ -7,7 +7,30 @@ from utils.utils import mkdir
 from Big_DRP_train import main
 os.environ['NUMEXPR_MAX_THREADS']='6'
 import numexpr as ne
-
+import pandas as pd
+import numpy as np
+from tqdm import tqdm
+from rdkit import Chem
+from rdkit.Chem import AllChem, DataStructs
+from rdkit.Chem import Descriptors
+from rdkit.ML.Descriptors import MoleculeDescriptors
+from torch.utils.data import DataLoader, TensorDataset
+from dgl.dataloading import MultiLayerFullNeighborSampler
+import random
+import torch
+from torch.utils.data import Dataset
+import dgl
+from sklearn.preprocessing import StandardScaler
+import torch.nn as nn
+import torch.nn.functional as F
+import dgl
+from dgl import DGLGraph
+from dgl.nn.pytorch import HeteroGraphConv, GraphConv
+import os
+import time
+from scipy.stats import pearsonr, spearmanr
+from collections import deque
+from sklearn.metrics import r2_score
 file_path = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -84,12 +107,14 @@ def preprocess(params):
                     "OUTROOT", "MODE", "SEED",
                     "DRUG_FEATURE", "NETWORK_PERCENTILE"]
     data_dir = os.environ['CANDLE_DATA_DIR'] + "/BiG-DRP/Data/"
+    preprocessed_dir = os.environ['CANDLE_DATA_DIR'] + "/BiG-DRP/Data/preprocessed"
     drug_feature_dir = data_dir + "/drp-data/grl-preprocessed/drug_features/"
     drug_response_dir = data_dir + "/drp-data/grl-preprocessed/drug_response/"
     sanger_tcga_dir = data_dir + "/drp-data/grl-preprocessed/sanger_tcga/"    
     mkdir(drug_feature_dir)
     mkdir(drug_response_dir)
     mkdir(sanger_tcga_dir)
+    mkdir(preprocessed_dir)
 
     model_param_key = []
     for key in params.keys():
@@ -106,6 +131,7 @@ def preprocess(params):
     model_label_file = data_dir + "/" + params['binary_file']
     tcga_file =  data_dir + "//supplementary/" + params['tcga_file']
     smiles_file =  data_dir + "/supplementary/" + params['smiles_file']
+    params['fpkm_file'] = data_dir + "/preprocessed/sanger_fpkm.csv"
     params['model_label_file'] = model_label_file
     params['enst_file'] = enst_file
     params['smiles_file'] =  smiles_file
@@ -123,28 +149,19 @@ def preprocess(params):
 
 class MyEncoder(JSONEncoder):
     def default(self, obj):
-        return obj.__dict__    
+        return obj.__dict__ 
 
-def run(params):
-    params['data_type'] = str(params['data_type'])
-    json_out = params['output_dir']+'/params.json'
-    try:
-        with open (json_out, 'w') as fp:
-            json.dump(params, fp, indent=4, cls=MyEncoder)
-    except AttributeError:
-        pass
-
-    drp_params = dict((k, params[k]) for k in ('dataroot', 'drug_feat',
-                                               'folder', 'mode', 'network_perc',
-                                               'normalize_response', 'outroot', 'seed',
-                                               'split', 'weight_folder'))
-    scores = main(drp_params, params['learning_rate'], params['epochs'], params['batch_size'])
+#    drp_params = dict((k, params[k]) for k in ('dataroot', 'drug_feat',
+#                                               'folder', 'mode', 'network_perc',
+#                                               'normalize_response', 'outroot', 'seed',
+#                                               'split', 'weight_folder'))
+#    scores = main(drp_params, params['learning_rate'], params['epochs'], params['batch_size'])
 #    with open(params['output_dir'] + "/scores.json", "w", encoding="utf-8") as f:
 #        json.dump(scores, f, ensure_ascii=False, indent=4)
 #    print('IMPROVE_RESULT RMSE:\t' + str(scores['rmse']))
 
 
-def processes_geneexpression(outdir, rnaseq_fpkm, enst_list, tcga_file):
+def processes_geneexpression(gene_identifiers, rnaseq_fpkm, enst_list, tcga_file):
     filter_enst_df = pd.read_csv(enst_list)
     filter_enst_list = filter_enst_df['ensembl_gene_id'].tolist()
     fpkm_chunk = pd.read_csv(rnaseq_fpkm, chunksize=500000, index_col=0)
@@ -161,15 +178,15 @@ def processes_geneexpression(outdir, rnaseq_fpkm, enst_list, tcga_file):
     fpkm = fpkm.drop('ensembl_gene_id', axis=1)
     fpkm = fpkm.dropna()
     fpkm = fpkm.T
-    fpkm = fpkm.loc[fpkm.index.str.contains("SIDM")]
+#    fpkm = fpkm.loc[fpkm.index.str.contains("SIDM")]
+#    print(fpkm.index.tolist())
     fpkm_num_thresh = np.floor(0.1*len(fpkm))
     to_keep = (fpkm.astype(float) > 1).sum() > fpkm_num_thresh
     f_log = (fpkm.loc[:,to_keep].astype(float) +1).apply(np.log2)
     f_log = f_log.loc[:, f_log.std() > 0.1]
     tcga = pd.read_csv(tcga_file, index_col=0)
-    print(len(tcga.index.intersection(f_log.columns)))
     common = tcga.index.intersection(f_log.columns)
-    preprocess_out = outdir + "/preprocessed/sanger_fpkm.csv"
+    preprocess_out = "Data/preprocessed/sanger_fpkm.csv"
     f_log[common].T.to_csv(preprocess_out)
 
 def filter_labels(df, syn, cells, drug_col):
@@ -247,7 +264,7 @@ def preprocess_gdsc(ic50_file,binary_file,drug_synonyms, fpkm_file):
     df = lnic50.T
     df = filter_labels(df, syn, cells, drug_col='sample_names')
     df = df.sort_index()[cells]
-    df.to_csv('data/preprocessed/gdsc_ln_ic50_cleaned.csv')
+    df.to_csv('Data/preprocessed/gdsc_ln_ic50_cleaned.csv')
     print("lnIC50 matrix size:", df.shape)
     drugs = list(df.index)
 
@@ -267,7 +284,9 @@ def preprocess_gdsc(ic50_file,binary_file,drug_synonyms, fpkm_file):
     }
     bin_data = bin_data.replace(reps)
     bin_data = bin_data.sort_index()[cells]
-    bin_data.to_csv('data/preprocessed/gdsc_bin_cleaned.csv')
+    OUTFILE = "Data/preprocessed/gdsc_bin_cleaned.csv"
+    bin_data.to_csv(OUTFILE)
+    print("Generated cleaned gdsc bin file {0}".format(OUTFILE))
     print("Binarized matrix size:", bin_data.shape)
 
 
@@ -286,10 +305,12 @@ def preprocess_gdsc(ic50_file,binary_file,drug_synonyms, fpkm_file):
             'resistant': bin_data.loc[drugs[drug], cells[cl]]}
         tuples.loc[i] = x
         i += 1
-    tuples.to_csv('data/preprocessed/gdsc_tuple_labels.csv')
+    OUTFILE = "Data/preprocessed/gdsc_tuple_labels.csv"
+    tuples.to_csv(OUTFILE)
+    print("Generated gdsc tuple labels {0}".format(OUTFILE))
 
 def generate_drug_smiles():
-    drugs = pd.read_csv('data/preprocessed/gdsc_bin_cleaned.csv', index_col=0).index
+    drugs = pd.read_csv('Data/preprocessed/gdsc_bin_cleaned.csv', index_col=0).index
 
     drugs_smiles = pd.DataFrame()
     no_data = []
@@ -307,10 +328,11 @@ def generate_drug_smiles():
 
     drugs_smiles = drugs_smiles.T
     drugs_smiles.columns = ['smiles']
-    drugs_smiles.to_csv('data/supplementary/gdsc_drugs_smiles_250.csv')
+    OUTFILE = "Data/preprocessed/gdsc_drugs_smiles_250.csv"
+    drugs_smiles.to_csv(OUTFILE)
 
 def generate_morganprint(smiles_file):
-    OUTFILE = 'data/preprocessed/gdsc_250_morgan.csv'
+    OUTFILE = 'Data/preprocessed/gdsc_250_morgan.csv'
     smiles = pd.read_csv(smiles_file, index_col=0)
     smiles = smiles.dropna()
     new_df = pd.DataFrame(index=smiles.index, columns=range(512))
@@ -321,13 +343,13 @@ def generate_morganprint(smiles_file):
         arr = np.zeros((0,), dtype=np.int8)
         DataStructs.ConvertToNumpyArray(fp,arr)
         new_df.loc[drug] = arr 
-
-    new_df.to_csv(OUTFILE)
     
+    new_df.to_csv(OUTFILE)
+    print("morgan fingerprint file generated at {0}".format(OUTFILE))
 
 
 def generate_drug_descriptors(smiles_file):
-    OUTFILE = 'data/preprocessed/gdsc_250_drug_descriptors.csv'
+    OUTFILE = 'Data/preprocessed/gdsc_250_drug_descriptors.csv'
 
     smiles = pd.read_csv(smiles_file, index_col=0)
     smiles = smiles.dropna()
@@ -343,6 +365,7 @@ def generate_drug_descriptors(smiles_file):
         new_df.loc[drug] = desc
 
     new_df.to_csv(OUTFILE)
+    print("Drug descriptor file generated at {0}".format(OUTFILE))
 
 def get_splits(idx, n_folds):
     """
@@ -418,9 +441,9 @@ def leave_pairs_out(tuples, drugs):
     return tuples
 
 def generate_splits():
-    cells = pd.read_csv('data/preprocessed/sanger_fpkm.csv', index_col=0).columns
-    labels = pd.read_csv('data/preprocessed/gdsc_bin_cleaned.csv', index_col=0)
-    drugs = pd.read_csv('data/preprocessed/gdsc_250_morgan.csv', index_col=0)
+    cells = pd.read_csv('Data/preprocessed/sanger_fpkm.csv', index_col=0).columns
+    labels = pd.read_csv('Data/preprocessed/gdsc_bin_cleaned.csv', index_col=0)
+    drugs = pd.read_csv('Data/preprocessed/gdsc_250_morgan.csv', index_col=0)
 
     orig_cells_gex = len(cells)
     orig_cells_lab = labels.shape[1]
@@ -449,7 +472,7 @@ def generate_splits():
 
     # print('current cells: %d'%len(labels.index) )
 
-    tuples = pd.read_csv('data/preprocessed/gdsc_tuple_labels.csv', index_col=0)
+    tuples = pd.read_csv('Data/preprocessed/gdsc_tuple_labels.csv', index_col=0)
     tuples['resistant'] = tuples['resistant'].astype(int)
     tuples['sensitive'] = (tuples['resistant'] + 1)%2
     # remove tuples that don't have drug or cell line data
@@ -473,9 +496,30 @@ def generate_splits():
 
     df.index = range(len(df))
     df['pair_fold'] = df['pair_fold'].replace(np.nan, -1).astype(int)
-    df.to_csv('data/preprocessed/gdsc_tuple_labels_folds.csv')
+    df.to_csv('Data/preprocessed/gdsc_tuple_labels_folds.csv')
 
 
+def run(params):
+    params['data_type'] = str(params['data_type'])
+    json_out = params['output_dir']+'/params.json'
+    try:
+        with open (json_out, 'w') as fp:
+            json.dump(params, fp, indent=4, cls=MyEncoder)
+    except AttributeError:
+        pass
+    print(params)
+
+    processes_geneexpression(params['gene_identifiers'],
+                             params['rnaseq_fpkm'],
+                             params['enst_list'], params['tcga_file'])
+#    print(params['fpkm_file'])
+    preprocess_gdsc(params['lnic50_file'], params['binary_file'],
+                    params['drug_synonyms'], params['fpkm_file'])
+    generate_morganprint(params['smiles_file'])
+    generate_drug_descriptors(params['smiles_file'])
+    generate_splits()
+
+    
 def candle_main():
     params = initialize_parameters()
     params =  preprocess(params)

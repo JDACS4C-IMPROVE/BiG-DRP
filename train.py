@@ -8,6 +8,121 @@ from torch.utils.data import DataLoader, TensorDataset
 from bigdrp.trainer import Trainer
 import numpy as np
 import pandas as pd
+import os
+import candle
+
+# Just because the tensorflow warnings are a bit verbose
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+file_path = os.path.dirname(os.path.realpath(__file__))
+
+
+# This should be set outside as a user environment variable
+os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/'
+
+
+# additional definitions
+additional_definitions = [
+    {
+        "name": "batch_size",
+        "type": int,
+        "help": "...",
+    },
+    {
+        "name": "learning_rate",
+        "type": int,
+        "help": "learning rate for the model",
+    },
+    {   
+        "name": "epoch",
+        "type": int,
+        "help": "number of epochs to train on",
+    },
+    {
+        "name": "network_percentile",
+        "type": int,
+        "help": "network percentile for metrics",
+    },
+    {   
+        "name": "cuda",
+        "type": int, 
+        "help": "CUDA ID",
+    },
+]
+
+# required definitions
+required = None
+
+# initialize class
+class BiG_drp_candle(candle.Benchmark):
+    def set_locals(self):
+        """
+        Functionality to set variables specific for the benchmark
+        - required: set of required parameters for the benchmark.
+        - additional_definitions: list of dictionaries describing the additional parameters for the benchmark.
+        """
+        if required is not None: 
+            self.required = set(required)
+        if additional_definitions is not None:
+            self.additional_definisions = additional_definitions
+
+            
+def initialize_parameters():
+    preprocessor_bmk = BiG_drp_candle(file_path,
+        'BiG_DRP_model.txt',
+        'pytorch',
+        prog='BiG_drp_candle',
+        desc='Data Preprocessor'
+    )
+    #Initialize parameters
+    candle_data_dir = os.getenv("CANDLE_DATA_DIR")
+    gParameters = candle.finalize_parameters(preprocessor_bmk)
+    return gParameters
+
+
+def preprocess(params):
+    keys_parsing = ["DATAROOT", "FOLDER", "WEIGHT_FOLDER",
+                    "OUTROOT", "MODE", "SEED",
+                    "DRUG_FEATURE", "NETWORK_PERCENTILE"]
+    data_dir = os.environ['CANDLE_DATA_DIR'] + "/BiG-DRP/Data/"
+    preprocessed_dir = os.environ['CANDLE_DATA_DIR'] + "/BiG-DRP/Data/preprocessed"
+    drug_feature_dir = data_dir + "/drp-data/grl-preprocessed/drug_features/"
+    drug_response_dir = data_dir + "/drp-data/grl-preprocessed/drug_response/"
+    sanger_tcga_dir = data_dir + "/drp-data/grl-preprocessed/sanger_tcga/"    
+    mkdir(drug_feature_dir)
+    mkdir(drug_response_dir)
+    mkdir(sanger_tcga_dir)
+    mkdir(preprocessed_dir)
+
+    model_param_key = []
+    for key in params.keys():
+        if key not in keys_parsing:
+                model_param_key.append(key)
+    model_params = {key: params[key] for key in model_param_key}
+    params['model_params'] = model_params
+    args = candle.ArgumentStruct(**params)
+    drug_synonym_file = data_dir + "/" + params['drug_synonyms']
+    gene_expression_file = data_dir + "/" + params['rnaseq_fpkm']
+    gene_indentifiers_file = data_dir + "/" + params['gene_identifiers']
+    enst_file =  data_dir + "/" + params['enst_list']
+    ln50_file = data_dir + "/" + params['lnic50_file']
+    model_label_file = data_dir + "/" + params['binary_file']
+    tcga_file =  data_dir + "//supplementary/" + params['tcga_file']
+    smiles_file =  data_dir + "/supplementary/" + params['smiles_file']
+    params['fpkm_file'] = data_dir + "/preprocessed/sanger_fpkm.csv"
+    params['model_label_file'] = model_label_file
+    params['enst_file'] = enst_file
+    params['smiles_file'] =  smiles_file
+    params['model_label_file'] = model_label_file
+    params['smiles_file'] = smiles_file
+    params['tcga_file'] = tcga_file
+    params['dataroot'] = data_dir
+    params['folder'] = params['outroot']
+    params['outroot'] = params['outroot']
+    params['network_perc'] = params['network_percentile']
+    params['drug_feat'] = params['drug_feature']
+    params['drug_synonym'] = drug_synonym_file
+    return(params)
 
 def fold_validation(hyperparams, seed, network, train_data, val_data, cell_lines, 
     drug_feats, tuning, epoch, maxout=False):
@@ -247,3 +362,16 @@ def main(params, learning_rate, epoch, batch_size):
     print("Spearman: %f"%test_metrics[3])
     print("Note: This is not the per-drug performance that is reported in the paper")
     print("To obtain per-drug performance, use metrics/calculate_metrics.py")
+
+def candle_main():
+    params = initialize_parameters()
+    params =  preprocess(params)
+    drp_params = dict((k, params[k]) for k in ('dataroot', 'drug_feat',
+                                               'folder', 'mode', 'network_perc',
+                                               'normalize_response', 'outroot', 'seed',
+                                               'split', 'weight_folder'))
+    scores = main(drp_params, params['learning_rate'], params['epochs'], params['batch_size'])
+
+
+if __name__ == "__main__":
+    candle_main()
