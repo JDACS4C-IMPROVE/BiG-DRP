@@ -84,16 +84,11 @@ def preprocess(params):
     keys_parsing = ["DATAROOT", "FOLDER", "WEIGHT_FOLDER",
                     "OUTROOT", "MODE", "SEED",
                     "DRUG_FEATURE", "NETWORK_PERCENTILE"]
-    data_dir = os.environ['CANDLE_DATA_DIR'] + "/BiG-DRP/Data/"
-    preprocessed_dir = os.environ['CANDLE_DATA_DIR'] + "/BiG-DRP/Data/preprocessed"
+    data_dir = os.environ['CANDLE_DATA_DIR'] + "/BiG-DRP/Improve/Data/"
+    preprocessed_dir = os.environ['CANDLE_DATA_DIR'] + "/BiG-DRP/preprocessed"
     drug_feature_dir = data_dir + "/drp-data/grl-preprocessed/drug_features/"
     drug_response_dir = data_dir + "/drp-data/grl-preprocessed/drug_response/"
     sanger_tcga_dir = data_dir + "/drp-data/grl-preprocessed/sanger_tcga/"    
-    mkdir(drug_feature_dir)
-    mkdir(drug_response_dir)
-    mkdir(sanger_tcga_dir)
-    mkdir(preprocessed_dir)
-
     model_param_key = []
     for key in params.keys():
         if key not in keys_parsing:
@@ -102,19 +97,27 @@ def preprocess(params):
     params['model_params'] = model_params
     args = candle.ArgumentStruct(**params)
     drug_synonym_file = data_dir + "/" + params['drug_synonyms']
-    gene_expression_file = data_dir + "/" + params['rnaseq_fpkm']
-    gene_indentifiers_file = data_dir + "/" + params['gene_identifiers']
-    enst_file =  data_dir + "/" + params['enst_list']
+    gene_expression_file = sanger_tcga_dir + "/" + params['expression_out']
+#    gene_indentifiers_file = data_dir + "/" + params['gene_identifiers']
     ln50_file = data_dir + "/" + params['lnic50_file']
     model_label_file = data_dir + "/" + params['binary_file']
-    tcga_file =  data_dir + "//supplementary/" + params['tcga_file']
-    smiles_file =  data_dir + "/supplementary/" + params['smiles_file']
-    params['fpkm_file'] = data_dir + "/preprocessed/sanger_fpkm.csv"
+    tcga_file =  params['supplementary_dir'] + params['tcga_file']
+    data_bin_cleaned_out = drug_feature_dir + "anl_data_bined.csv"
+    data_cleaned_out = drug_feature_dir + "anl_data_cleaned.csv"
+    data_tuples_out = drug_response_dir + "anl_data_tuples.csv"
+    tuples_label_fold_out = drug_response_dir + "anl_data_tuples_fold.csv"
+    smiles_file = data_dir + params['smiles_file']
+    params['data_bin_cleaned_out'] = data_bin_cleaned_out
+    params['ic50_input'] = data_dir + "/" + params['lnic50_file']
+    params['binary_input'] = data_dir + "/" + params['binary_file']
+    params['fpkm_file'] = gene_expression_file
+    params['anl_descriptors'] = drug_feature_dir + "/" + params['descriptor_out'] 
+    params['morgan_data_out'] = drug_feature_dir + "/" + params['morgan_out']
     params['model_label_file'] = model_label_file
-    params['enst_file'] = enst_file
     params['smiles_file'] =  smiles_file
     params['model_label_file'] = model_label_file
-    params['smiles_file'] = smiles_file
+    params['tuples_label_out'] = drug_feature_dir + "/" + params['data_tuples_out']
+    params['tuples_label_fold_out'] = drug_feature_dir + "/" + params['tuples_label_fold_out']
     params['tcga_file'] = tcga_file
     params['dataroot'] = data_dir
     params['folder'] = params['outroot']
@@ -122,6 +125,10 @@ def preprocess(params):
     params['network_perc'] = params['network_percentile']
     params['drug_feat'] = params['drug_feature']
     params['drug_synonym'] = drug_synonym_file
+    params['data_bin_cleaned_out'] = data_bin_cleaned_out
+    params['data_cleaned_out'] = data_cleaned_out
+    params['data_tuples_out'] = data_tuples_out
+    params['tuples_label_fold_out'] = tuples_label_fold_out
     return(params)
 
 def fold_validation(hyperparams, seed, network, train_data, val_data, cell_lines, 
