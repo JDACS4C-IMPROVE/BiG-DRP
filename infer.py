@@ -93,7 +93,10 @@ def get_per_drug_metric(df, y, y_bin=None):
             true_bin = y_bin[drug].values[mask]
             true_bin = true_bin.astype(int)
             if true_bin.mean() != 1:
-                auroc = roc_auc_score(true_bin, prediction)
+                try:
+                    auroc = roc_auc_score(true_bin, prediction)
+                except ValueError:
+                    pass
             else:
                 auroc = np.nan
             metrics.loc[drug] = [scc,pcc,rmse,r2,auroc]
