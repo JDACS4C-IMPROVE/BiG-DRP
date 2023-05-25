@@ -4,6 +4,7 @@ from scipy.stats import spearmanr
 import json
 import argparse
 from sklearn.metrics import roc_auc_score
+from sklearn.metrics import r2_score
 from scipy.stats import pearsonr, spearmanr
 from tqdm import tqdm
 import os
@@ -18,6 +19,7 @@ file_path = os.path.dirname(os.path.realpath(__file__))
 
 # This should be set outside as a user environment variable
 os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/'
+
 
 
 def load_predictions(folder, split, fold_mask, file_prefix='val_prediction_fold'):
@@ -72,10 +74,10 @@ def get_per_drug_metric(df, y, y_bin=None):
     y0 = y.replace(np.nan, 0)
     drugs = df.columns
     if y_bin is not None:
-        metrics = pd.DataFrame(columns=['SCC', 'PCC', 'RMSE', 'AUROC'])
+        metrics = pd.DataFrame(columns=['SCC', 'PCC', 'RMSE', 'R2', 'AUROC'])
         calc_auroc = True
     else:
-        metrics = pd.DataFrame(columns=['SCC', 'PCC', 'RMSE'])
+        metrics = pd.DataFrame(columns=['SCC', 'PCC', 'RMSE', 'R2'])
 
     for drug in drugs:
         mask = y0[drug].values.nonzero()
@@ -85,7 +87,8 @@ def get_per_drug_metric(df, y, y_bin=None):
         rmse = np.sqrt(((prediction-true_label)**2).mean())
         scc = spearmanr(true_label, prediction)[0]
         pcc = pearsonr(true_label, prediction)[0]
-
+        r2 = r2_score(true_label, prediction)
+        
         if calc_auroc:
             true_bin = y_bin[drug].values[mask]
             true_bin = true_bin.astype(int)
@@ -93,9 +96,9 @@ def get_per_drug_metric(df, y, y_bin=None):
                 auroc = roc_auc_score(true_bin, prediction)
             else:
                 auroc = np.nan
-            metrics.loc[drug] = [scc,pcc,rmse,auroc]
+            metrics.loc[drug] = [scc,pcc,rmse,r2,auroc]
         else:
-            metrics.loc[drug] = [scc,pcc,rmse]
+            metrics.loc[drug] = [scc,pcc,rmse,r2]
 
     return metrics
 
@@ -126,7 +129,8 @@ def get_per_drug_fold_metric(df, y, fold_mask, y_bin=None):
             rmse = np.sqrt(((prediction-true_label)**2).mean())
             scc = spearmanr(true_label, prediction)[0]
             pcc = pearsonr(true_label, prediction)[0]
-
+            r2 = r2_score(true_label, prediction)
+            
             if calc_auroc:
                 true_bin = y_bin[drug].values[mask]
                 true_bin = true_bin.astype(int)
@@ -134,9 +138,9 @@ def get_per_drug_fold_metric(df, y, fold_mask, y_bin=None):
                     auroc = roc_auc_score(true_bin, prediction)
                 else:
                     auroc = np.nan
-                temp[i] = [scc,pcc,rmse,auroc]
+                temp[i] = [scc,pcc,rmse,r2,auroc]
             else:
-                temp[i] = [scc,pcc,rmse]
+                temp[i] = [scc,pcc,rmse,r2]
 
         metrics.loc[drug] = temp.mean(axis=0)
     return metrics
@@ -146,8 +150,11 @@ def get_per_drug_fold_metric(df, y, fold_mask, y_bin=None):
 def launch(args):
     folder = args.folder
 
+    data_dir = os.environ['CANDLE_DATA_DIR'] + "/BiG-DRP/Improve/Data/"
+    drug_response_dir = data_dir + "/drp-data/grl-preprocessed/drug_response/"
+    drugset = data_dir + "/" + args.drug_list
     # load labels
-    labels = args.preprocessed_dir + "/" + args.labels
+    labels = drug_response_dir + "/" + args.tuples_label_fold_out
     y_tup = pd.read_csv(labels, index_col=0)
     if args.split == 'lpo':
         y_tup['fold'] = y_tup['pair_fold']
@@ -161,7 +168,7 @@ def launch(args):
     samples = list(y_tup['cell_line'].unique())
 
     # load drugs
-    drugs = open(args.drugset).read().split('\n')
+    drugs = open(drugset).read().split('\n')
     if drugs[-1] == '': drugs=drugs[:-1]
 
     # filter out unnecessary samples/drugs
@@ -228,6 +235,7 @@ def run(gParameters):
     print("In Run Function:\n")
     args = candle.ArgumentStruct(**gParameters)
     # Call launch() with specific model arch and args with all HPs
+    print(args)
     scores = launch(args)
 
     # Supervisor HPO
