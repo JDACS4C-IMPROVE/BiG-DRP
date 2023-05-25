@@ -44,7 +44,7 @@ os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/'
 #parent path
 fdir = Path('__file__').resolve().parent
 source = "csa_data/raw_data/splits/"
-auc_threshold=0.8
+auc_threshold=0.5
 
 # initialize class
 class BiG_drp_candle(candle.Benchmark):
@@ -147,6 +147,7 @@ def preprocess(params):
     params['data_bin_cleaned_out'] = data_bin_cleaned_out
     params['ic50_input'] = data_dir + "/" + params['lnic50_file']
     params['binary_input'] = data_dir + "/" + params['binary_file']
+    params['drug_out'] = data_dir + '/' + params['drug_list']
     params['fpkm_file'] = gene_expression_file
     params['anl_descriptors'] = drug_feature_dir + "/" + params['descriptor_out'] 
     params['morgan_data_out'] = drug_feature_dir + "/" + params['morgan_out']
@@ -510,7 +511,7 @@ def generate_splits(params):
     labels = labels[common] # (drugs x cells)
 
     drug_list = labels.index.tolist()
-    drug_out =  params['data_dir'] + "/" + params['drug_list']
+    drug_out =  params['drug_out'] 
     with open(drug_out, "w+") as fout:
         for i in drug_list:
             fout.write(i +'\n')

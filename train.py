@@ -177,6 +177,7 @@ def fold_validation(hyperparams, seed, network, train_data, val_data, cell_lines
     n_drug_feats = drug_feats.shape[1]
 
     trainer = Trainer(n_genes, cell_lines, drug_feats, network, hyperparams)
+    print("number of epochs is {0}".format(epoch))
     val_error, metric_names = trainer.fit(
             num_epoch=epoch, 
             train_loader=train_loader, 
@@ -235,6 +236,9 @@ def create_dataset(tuples, train_x, val_x,
 def nested_cross_validation(FLAGS, drug_feats, cell_lines, labels,
                             label_matrix, normalizer, learning_rate, epoch, batch_size):
     reset_seed(FLAGS.seed)
+    print("number of epochs is {0}".format(epoch))
+    print("learning rate is {0}".format(learning_rate))
+    print("batch_size is {0}".format(batch_size))    
     hyperparams = {
         'learning_rate': learning_rate,
         'num_epoch': epoch,
