@@ -34,7 +34,7 @@ Note: The train.sh script will download the original authors data if the Data di
 
 ## Setting up environment
 
-### Install Conda version version 22.11.1
+### Install Conda version 22.11.1
 
 * step 1: conda create -n python_BigDRP python=3.8 anaconda
 * step 2: conda activate python_BigDRP
@@ -42,7 +42,7 @@ Note: The train.sh script will download the original authors data if the Data di
 * step 4: pip install -r requirements.txt
 * step 5: pip install --pre dgl -f https://data.dgl.ai/wheels/cu113/repo.html
 * step 6: pip install --pre dglgo -f https://data.dgl.ai/wheels-test/repo.html
-* step 5: pip install git+https://github.com/ECP-CANDLE/candle_lib@0d32c6bb97ace0370074194943dbeaf9019e6503
+* step 7: pip install git+https://github.com/ECP-CANDLE/candle_lib@0d32c6bb97ace0370074194943dbeaf9019e6503
 
 
 ## REQUIREMENTS
