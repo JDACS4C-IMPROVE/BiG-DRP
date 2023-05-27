@@ -201,7 +201,7 @@ def launch(args):
     
     mets = ["spearman (fold.%d)"%i for i in range(5)]
     overall = pd.DataFrame(index=mets, columns=['normalized %s'%args.response, 'raw %s'%args.response])
-
+    scores = overall
     s = np.zeros((5, 2))
     for i in range(5):
         m  = ((fold_mask == i)*1).values.nonzero()
@@ -210,8 +210,6 @@ def launch(args):
     overall.loc[mets] = s
     overall.loc['spearman (fold.mean)'] = s.mean(axis=0)
     overall.loc['spearman (fold.stdev)'] = s.std(axis=0)
-    print(overall)
-
     outfile = '%s/%s_performance_%d_drugs.xlsx'%(args.results_dir, args.split, len(drugs))
     exwrite = pd.ExcelWriter(outfile)#, engine='xlsxwriter')
     overall.to_excel(exwrite, sheet_name='Overall')
@@ -231,19 +229,19 @@ def launch(args):
     per_drug_metric.to_excel(exwrite, sheet_name='Drug')
     drug_summary.to_excel(exwrite, sheet_name='Summary Drug')
     exwrite.save()
-
     print("Results written to: %s"%outfile)
-
+    return scores
+    
 def run(gParameters):
     print("In Run Function:\n")
     args = candle.ArgumentStruct(**gParameters)
     # Call launch() with specific model arch and args with all HPs
-    print(args)
     scores = launch(args)
-
+    print('printing scores ...')
+    print(scores)
     # Supervisor HPO
     with open(args.output_dir + "/scores_infer.json", "w", encoding="utf-8") as f:
-        json.dump(scores, f, ensure_ascii=False, indent=4)
+        json.dump(scores.to_json(), f, ensure_ascii=False, indent=4)
 
     return scores
 
