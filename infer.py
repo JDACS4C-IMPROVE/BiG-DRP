@@ -153,11 +153,11 @@ def get_per_drug_fold_metric(df, y, fold_mask, y_bin=None):
 def launch(args):
     folder = args.folder
 
-    data_dir = os.environ['CANDLE_DATA_DIR'] + "/BiG-DRP/Improve/Data/"
+    data_dir = os.environ['CANDLE_DATA_DIR'] + "/BiG-DRP/Data/BiG_DRP_data/BiG_DRP_data"
     drug_response_dir = data_dir + "/drp-data/grl-preprocessed/drug_response/"
-    drugset = data_dir + "/" + args.drug_list
+    drugset = 'metrics/lists/' + "/" + args.drugset
     # load labels
-    labels = drug_response_dir + "/" + args.tuples_label_fold_out
+    labels = drug_response_dir + "/" + args.labels
     y_tup = pd.read_csv(labels, index_col=0)
     if args.split == 'lpo':
         y_tup['fold'] = y_tup['pair_fold']
