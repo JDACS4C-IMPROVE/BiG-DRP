@@ -2,7 +2,7 @@ from utils.utils import mkdir, reset_seed
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-import utils.constants_anl as c
+import utils.constants as c
 
 def standardize(train_x, test_x):
     ss = StandardScaler()

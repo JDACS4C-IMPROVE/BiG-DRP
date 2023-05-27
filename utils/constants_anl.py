@@ -1,5 +1,0 @@
-_LABEL_FILE = '//drp-data/grl-preprocessed/drug_response/anl_data_tuples_fold.csv'
-_GENE_EXPRESSION_FILE = '//drp-data/grl-preprocessed/sanger_tcga//anl_fpkm.csv'
-_LABEL_MATRIX_FILE = '//drp-data/grl-preprocessed/drug_features/anl_data_cleaned.csv'
-_DRUG_DESCRIPTOR_FILE = '//drp-data/grl-preprocessed/drug_features//anl_descriptors.csv'
-_MORGAN_FP_FILE = '//drp-data/grl-preprocessed/drug_features//anl_morgan.csv'
