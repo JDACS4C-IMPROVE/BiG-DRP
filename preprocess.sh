@@ -11,7 +11,7 @@
 
 ### Path to your CANDLEized model's main Python script###
 
-CANDLE_MODEL=/homes/ac.rgnanaolivu/improve_data_dir/BiG-DRP/preprocess_new.py
+CANDLE_MODEL=preprocess_new.py
 
 if [ $# -lt 2 ] ; then
     echo "Illegal number of parameters"
@@ -54,6 +54,6 @@ echo "using CANDLE_CONFIG ${CANDLE_CONFIG}"
 # Set up environmental variables and execute model
 echo "activating environment"
 . /homes/ac.rgnanaolivu/miniconda3/etc/profile.d/conda.sh
-conda activate rohan_python
+conda activate python_BigDRP
 echo "running command ${CMD}"
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} CANDLE_DATA_DIR=${CANDLE_DATA_DIR} $CMD

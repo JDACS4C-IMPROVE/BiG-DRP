@@ -28,6 +28,7 @@ import dgl
 from dgl import DGLGraph
 from dgl.nn.pytorch import HeteroGraphConv, GraphConv
 import os
+import argparse
 import time
 from scipy.stats import pearsonr, spearmanr
 from collections import deque
@@ -43,7 +44,7 @@ os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/'
 
 #parent path
 fdir = Path('__file__').resolve().parent
-source = "csa_data/raw_data/splits/"
+#source = "csa_data/raw_data/splits/"
 auc_threshold=0.5
 
 # initialize class
@@ -78,12 +79,7 @@ def mv_file(download_file, req_file):
     else:
         shutil.move(download_file, req_file)
 
-def preprocess(params):
-    keys_parsing = ["DATAROOT", "FOLDER", "WEIGHT_FOLDER",
-                    "OUTROOT", "MODE", "SEED",
-                    "DRUG_FEATURE", "NETWORK_PERCENTILE"]
-    data_dir = os.environ['CANDLE_DATA_DIR'] + params['model_name'] + "/Improve/Data/"
-    #data_dir  = os.environ['CANDLE_DATA_DIR'] + params['model_name'] + "/Data/"
+def preprocess(params, data_dir):
     preprocessed_dir = data_dir + "/preprocessed"
     drug_feature_dir = data_dir + "/drp-data/grl-preprocessed/drug_features/"
     drug_response_dir = data_dir + "/drp-data/grl-preprocessed/drug_response/"
@@ -93,6 +89,43 @@ def preprocess(params):
     mkdir(sanger_tcga_dir)
     mkdir(preprocessed_dir)
 
+    args = candle.ArgumentStruct(**params)
+    drug_synonym_file = data_dir + "/" + params['drug_synonyms']
+    gene_expression_file = sanger_tcga_dir + "/" + params['expression_out']
+    ln50_file = data_dir + "/" + params['data_file']
+    model_label_file = data_dir + "/" + params['binary_file']
+    tcga_file =  data_dir +'/' + 'supplementary' + params['tcga_file']
+    data_bin_cleaned_out = drug_feature_dir + params['data_bin_cleaned_out']
+    data_cleaned_out = drug_response_dir + params['data_cleaned_out']
+    data_tuples_out = drug_response_dir + params['data_tuples_out']
+    tuples_label_fold_out = drug_response_dir + params['labels']
+    smiles_file = data_dir + params['smiles_file']
+    params['data_bin_cleaned_out'] = data_bin_cleaned_out
+    params['data_input'] = data_dir + "/" + params['data_file']
+    params['binary_input'] = data_dir + "/" + params['binary_file']
+    params['drug_out'] = data_dir + '/' + params['drugset']
+    params['fpkm_file'] = gene_expression_file
+    params['descriptors'] = drug_feature_dir + "/" + params['descriptor_out'] 
+    params['morgan_data_out'] = drug_feature_dir + "/" + params['morgan_out']
+    params['model_label_file'] = model_label_file
+    params['smiles_file'] =  smiles_file
+    params['model_label_file'] = model_label_file
+    params['tuples_label_out'] = drug_response_dir + "/" + params['data_tuples_out']
+    params['tuples_label_fold_out'] = drug_response_dir + "/" + params['labels']
+    params['tcga_file'] = tcga_file
+    params['dataroot'] = data_dir
+    params['folder'] = params['outroot']
+    params['outroot'] = params['outroot']
+    params['network_perc'] = params['network_percentile']
+    params['drug_feat'] = params['drug_feature']
+    params['drug_synonym'] = drug_synonym_file
+    params['data_bin_cleaned_out'] = data_bin_cleaned_out
+    params['data_cleaned_out'] = data_cleaned_out
+    params['data_tuples_out'] = data_tuples_out
+    params['tuples_label_fold_out'] = tuples_label_fold_out
+    return(params)
+
+def download_anl_data(params):
     csa_data_folder = os.path.join(os.environ['CANDLE_DATA_DIR'] + params['model_name'], 'csa_data', 'raw_data')
     splits_dir = os.path.join(csa_data_folder, 'splits') 
     x_data_dir = os.path.join(csa_data_folder, 'x_data')
@@ -125,63 +158,16 @@ def preprocess(params):
                                    cache_subdir=None)
 
     
-
-    model_param_key = []
-    for key in params.keys():
-        if key not in keys_parsing:
-                model_param_key.append(key)
-    model_params = {key: params[key] for key in model_param_key}
-    params['model_params'] = model_params
-    args = candle.ArgumentStruct(**params)
-    drug_synonym_file = data_dir + "/" + params['drug_synonyms']
-    gene_expression_file = sanger_tcga_dir + "/" + params['expression_out']
-#    gene_indentifiers_file = data_dir + "/" + params['gene_identifiers']
-    ln50_file = data_dir + "/" + params['lnic50_file']
-    model_label_file = data_dir + "/" + params['binary_file']
-    tcga_file =  params['supplementary_dir'] + params['tcga_file']
-    data_bin_cleaned_out = drug_feature_dir + "anl_data_bined.csv"
-    data_cleaned_out = drug_feature_dir + "anl_data_cleaned.csv"
-    data_tuples_out = drug_response_dir + "anl_data_tuples.csv"
-    tuples_label_fold_out = drug_response_dir + "anl_data_tuples_fold.csv"
-    smiles_file = data_dir + params['smiles_file']
-    params['data_bin_cleaned_out'] = data_bin_cleaned_out
-    params['ic50_input'] = data_dir + "/" + params['lnic50_file']
-    params['binary_input'] = data_dir + "/" + params['binary_file']
-    params['drug_out'] = data_dir + '/' + params['drug_list']
-    params['fpkm_file'] = gene_expression_file
-    params['anl_descriptors'] = drug_feature_dir + "/" + params['descriptor_out'] 
-    params['morgan_data_out'] = drug_feature_dir + "/" + params['morgan_out']
-    params['model_label_file'] = model_label_file
-    params['smiles_file'] =  smiles_file
-    params['model_label_file'] = model_label_file
-    params['tuples_label_out'] = drug_response_dir + "/" + params['data_tuples_out']
-    params['tuples_label_fold_out'] = drug_response_dir + "/" + params['tuples_label_fold_out']
-    params['tcga_file'] = tcga_file
-    params['dataroot'] = data_dir
-    params['folder'] = params['outroot']
-    params['outroot'] = params['outroot']
-    params['network_perc'] = params['network_percentile']
-    params['drug_feat'] = params['drug_feature']
-    params['drug_synonym'] = drug_synonym_file
-    params['data_bin_cleaned_out'] = data_bin_cleaned_out
-    params['data_cleaned_out'] = data_cleaned_out
-    params['data_tuples_out'] = data_tuples_out
-    params['tuples_label_fold_out'] = tuples_label_fold_out
+def download_author_data(params, data_dir):
+    data_download_filepath = candle.get_file(params['original_data'], params['data_url'],
+                                             datadir = data_dir,
+                                             cache_subdir = None)
     return(params)
 
 
 class MyEncoder(JSONEncoder):
     def default(self, obj):
         return obj.__dict__ 
-
-#    drp_params = dict((k, params[k]) for k in ('dataroot', 'drug_feat',
-#                                               'folder', 'mode', 'network_perc',
-#                                               'normalize_response', 'outroot', 'seed',
-#                                               'split', 'weight_folder'))
-#    scores = main(drp_params, params['learning_rate'], params['epochs'], params['batch_size'])
-#    with open(params['output_dir'] + "/scores.json", "w", encoding="utf-8") as f:
-#        json.dump(scores, f, ensure_ascii=False, indent=4)
-#    print('IMPROVE_RESULT RMSE:\t' + str(scores['rmse']))
 
 
 def convert_to_binary(x):
@@ -220,7 +206,6 @@ def create_data_inputs(params):
     rs_tdf = rs_tdf.rename({'compounds': "sample_names"},axis=1)
     rs_tdf.to_csv(data_input, index_label="improve_id")
    
-
 def process_expression(tcga_file, expression_out):
     ge = improve_utils.load_gene_expression_data(gene_system_identifier="Ensembl")
     expression_tdf = ge.dropna()
@@ -293,11 +278,9 @@ def filter_labels(df, syn, cells, drug_col):
     df = df.loc[not_dups]
     df.index = df[drug_col]
     df = df.loc[df.index!='improve_id']
-
     return df
 
 def preprocess_gdsc(params):
-
     ic50_file = params['ic50_input']
     binary_file = params['binary_input']
     drug_synonyms = params['drug_synonyms']
@@ -305,7 +288,6 @@ def preprocess_gdsc(params):
     data_cleaned_out = params['data_cleaned_out']
     data_bin_cleaned_out = params['data_bin_cleaned_out']
     data_tuples_out = params['data_tuples_out']
-    print("Processing lnIC50 data...")
     syn = pd.read_csv(drug_synonyms, header=None)
     cells = pd.read_csv(fpkm_file, index_col=0).columns
     lnic50 = pd.read_csv(ic50_file, index_col=1, header=None)                                                 
@@ -314,7 +296,7 @@ def preprocess_gdsc(params):
     df = filter_labels(df, syn, cells, drug_col='sample_names')
     df = df.sort_index()[cells]
     df.to_csv(data_cleaned_out)
-    print("lnIC50 matrix size:", df.shape)
+    print("Data matrix size:", df.shape)
     drugs = list(df.index)
 
     # BINARIZED DATA                                                                                                                        
@@ -334,13 +316,13 @@ def preprocess_gdsc(params):
     bin_data = bin_data.sort_index()[cells]
     OUTFILE = data_bin_cleaned_out
     bin_data.to_csv(OUTFILE)
-    print("Generated cleaned gdsc bin file {0}".format(OUTFILE))
+    print("Generated cleaned bin file {0}".format(OUTFILE))
     print("Binarized matrix size:", bin_data.shape)
 
 
     # TUPLE DATA                                                                                                                            
     print("Processing tuple data...")
-    tuples = pd.DataFrame(columns=['drug', 'improve_id', 'cell_line', 'ln_ic50', 'resistant'])
+    tuples = pd.DataFrame(columns=['drug', 'improve_id', 'cell_line', 'response', 'resistant'])
     idx = np.transpose((1-np.isnan(np.asarray(df.values, dtype=float))).nonzero())
 
     print("num tuples:",  len(idx))
@@ -350,13 +332,13 @@ def preprocess_gdsc(params):
         x = {'drug': drugs[drug],
             'improve_id': lnic50.loc[cells[cl]][0],
             'cell_line': cells[cl],
-            'ln_ic50': df.loc[drugs[drug], cells[cl]],
+            'response': df.loc[drugs[drug], cells[cl]],
             'resistant': bin_data.loc[drugs[drug], cells[cl]]}
         tuples.loc[i] = x
         i += 1
     OUTFILE = data_tuples_out
     tuples.to_csv(OUTFILE)
-    print("Generated gdsc tuple labels {0}".format(OUTFILE))
+    print("Generated tuple labels {0}".format(OUTFILE))
 
 def generate_drug_descriptors(smiles_file, descriptor_out):
     OUTFILE = descriptor_out
@@ -565,12 +547,12 @@ def generate_splits(params):
     
 
 def write_out_constants(params):
-    constant_file = "utils/constants_anl.py"
+    constant_file = "utils/constants.py"
     with open(constant_file, 'w+') as fout:
         _LABEL_FILE = params['tuples_label_fold_out'].split("Data")[1] 
         _GENE_EXPRESSION_FILE = params['fpkm_file'].split("Data")[1]
         _LABEL_MATRIX_FILE = params['data_cleaned_out'].split("Data")[1]
-        _DRUG_DESCRIPTOR_FILE = params['anl_descriptors'].split("Data")[1]
+        _DRUG_DESCRIPTOR_FILE = params['descriptors'].split("Data")[1]
         _MORGAN_FP_FILE = params['morgan_data_out'].split("Data")[1]
         fout.write("_LABEL_FILE = '{0}'".format(_LABEL_FILE) + '\n')
         fout.write("_GENE_EXPRESSION_FILE = '{0}'".format(_GENE_EXPRESSION_FILE) + '\n')
@@ -589,18 +571,27 @@ def run(params):
     print(params)
 
     
-def candle_main():
+def candle_main(anl):
     params = initialize_parameters()
-    params =  preprocess(params)
+    data_dir = os.environ['CANDLE_DATA_DIR'] + params['model_name'] + "/Data/BiG_DRP_data/"
+    params =  preprocess(params, data_dir)
     run(params)
-    create_data_inputs(params)
-    creating_drug_and_smiles_input(params['smiles_file'], params['drug_synonyms'])
-    process_expression(params['tcga_file'], params['fpkm_file'])
-    preprocess_gdsc(params)
-    generate_drug_descriptors(params['smiles_file'], params['anl_descriptors'])
-    generate_morganprint(params['smiles_file'], params['morgan_data_out'])
-    generate_splits(params)
-    write_out_constants(params)
-
+    if params['improve_analysis'] == 'yes' or anl:
+        create_data_inputs(params)
+        creating_drug_and_smiles_input(params['smiles_file'], params['drug_synonyms'])
+        process_expression(params['tcga_file'], params['fpkm_file'])
+        preprocess_gdsc(params)
+        generate_drug_descriptors(params['smiles_file'], params['anl_descriptors'])
+        generate_morganprint(params['smiles_file'], params['morgan_data_out'])
+        generate_splits(params)
+        write_out_constants(params)
+    else:
+        download_author_data(params, data_dir)
+        write_out_constants(params)
+        
 if __name__ == "__main__":
-    candle_main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('-a', dest='anl',  default=False)
+    args = parser.parse_args()
+    candle_main(args.anl)
+
