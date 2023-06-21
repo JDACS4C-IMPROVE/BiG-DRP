@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import os
 import candle
-
+torch.cuda.empty_cache()
 # Just because the tensorflow warnings are a bit verbose
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -364,7 +364,6 @@ def main(params, learning_rate, epoch, batch_size):
     test_metrics = nested_cross_validation(FLAGS, drug_feats, cell_lines, labels,
                                            label_matrix, normalizer, learning_rate, epoch, batch_size)
     test_metrics = test_metrics.mean(axis=0)
-
     print("Overall Performance")
     print("MSE: %f"%test_metrics[0])
     print("RMSE: %f"%np.sqrt(test_metrics[0]))
@@ -373,7 +372,10 @@ def main(params, learning_rate, epoch, batch_size):
     print("Spearman: %f"%test_metrics[3])
     print("Note: This is not the per-drug performance that is reported in the paper")
     print("To obtain per-drug performance, use metrics/calculate_metrics.py")
+    test_out = params['output_dir'] +'/test_results.csv'
+    test_metrics.to_csv(test_out, index=False)
 
+    
 def candle_main():
     params = initialize_parameters()
     params =  preprocess(params)
