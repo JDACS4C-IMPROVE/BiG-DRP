@@ -94,7 +94,7 @@ def preprocess(params, data_dir):
     gene_expression_file = sanger_tcga_dir + "/" + params['expression_out']
     ln50_file = data_dir + "/" + params['data_file']
     model_label_file = data_dir + "/" + params['binary_file']
-    tcga_file =  data_dir +'/' + 'supplementary' + params['tcga_file']
+    tcga_file =  data_dir +'/BiG_DRP_data/' + 'supplementary/' + params['tcga_file']
     data_bin_cleaned_out = drug_feature_dir + params['data_bin_cleaned_out']
     data_cleaned_out = drug_response_dir + params['data_cleaned_out']
     data_tuples_out = drug_response_dir + params['data_tuples_out']
@@ -105,7 +105,7 @@ def preprocess(params, data_dir):
     params['binary_input'] = data_dir + "/" + params['binary_file']
     params['drug_out'] = data_dir + '/' + params['drugset']
     params['fpkm_file'] = gene_expression_file
-    params['descriptors'] = drug_feature_dir + "/" + params['descriptor_out'] 
+    params['descriptor_out'] = drug_feature_dir + "/" + params['descriptor_out'] 
     params['morgan_data_out'] = drug_feature_dir + "/" + params['morgan_out']
     params['model_label_file'] = model_label_file
     params['smiles_file'] =  smiles_file
@@ -118,7 +118,7 @@ def preprocess(params, data_dir):
     params['outroot'] = params['outroot']
     params['network_perc'] = params['network_percentile']
     params['drug_feat'] = params['drug_feature']
-    params['drug_synonym'] = drug_synonym_file
+    params['drug_synonyms'] = drug_synonym_file
     params['data_bin_cleaned_out'] = data_bin_cleaned_out
     params['data_cleaned_out'] = data_cleaned_out
     params['data_tuples_out'] = data_tuples_out
@@ -130,29 +130,32 @@ def download_anl_data(params):
     splits_dir = os.path.join(csa_data_folder, 'splits') 
     x_data_dir = os.path.join(csa_data_folder, 'x_data')
     y_data_dir = os.path.join(csa_data_folder, 'y_data')
-        
+
+    print("data downloaded dir is {0}".format(csa_data_folder))
     if not os.path.exists(csa_data_folder):
         print('creating folder: %s'%csa_data_folder)
         os.makedirs(csa_data_folder)
         mkdir(splits_dir)
         mkdir(x_data_dir)
         mkdir(y_data_dir)
+    
 
-    for improve_file in ['CCLE_all.txt', 'CCLE_split_0_test.txt',
-                         'CCLE_split_0_train.txt', 'CCLE_split_0_val.txt']:
-        url_dir = params['improve_data_url'] + "/splits/" 
+    for files in ['_all.txt', '_split_0_test.txt',
+                         '_split_0_train.txt', '_split_0_val.txt']:
+        url_dir = improve_data_url + "/splits/" 
+        improve_file = data_type + files
         candle.file_utils.get_file(improve_file, url_dir + improve_file,
                                    datadir=splits_dir,
                                    cache_subdir=None)
 
-    for improve_file in ['cancer_gene_expression.txt', 'drug_SMILES.txt','drug_ecfp4_512bit.txt' ]:
-        url_dir = params['improve_data_url'] + "/x_data/" 
+    for improve_file in ['cancer_gene_expression.tsv', 'drug_SMILES.tsv','drug_ecfp4_nbits512.tsv' ]:
+        url_dir = improve_data_url + "/x_data/" 
         candle.file_utils.get_file(fname=improve_file, origin=url_dir + improve_file,
                                    datadir=x_data_dir,
                                    cache_subdir=None)
 
-    url_dir = params['improve_data_url'] + "/y_data/"
-    response_file  = 'response.txt'
+    url_dir = improve_data_url + "/y_data/"
+    response_file  = 'response.tsv'
     candle.file_utils.get_file(fname=response_file, origin=url_dir + response_file,
                                    datadir=y_data_dir,
                                    cache_subdir=None)
@@ -181,7 +184,7 @@ def convert_to_binary(x):
 
     
 def create_data_inputs(params):
-    data_input = params['ic50_input']
+    data_input = params['data_input']
     binary_input = params['binary_input']
     data_type = params['data_type']
     metric = params['metric']
@@ -195,8 +198,9 @@ def create_data_inputs(params):
     rs_tdf = rs_df.set_index("improve_chem_id")
     rs_tdf = rs_tdf.T
     rs_binary_df = rs_tdf.applymap(convert_to_binary)
+    rep = len(rs_binary_df.columns)
     rs_binary_df.index.names = ['compounds']
-    thesholds = np.repeat([auc_threshold],24)
+    thesholds = np.repeat([auc_threshold],rep)
     thesholds = list(thesholds)
     rs_binary_df.loc['threshold'] = thesholds
     rs_binary_df = rs_binary_df.reset_index()
@@ -281,7 +285,7 @@ def filter_labels(df, syn, cells, drug_col):
     return df
 
 def preprocess_gdsc(params):
-    ic50_file = params['ic50_input']
+    ic50_file = params['data_input']
     binary_file = params['binary_input']
     drug_synonyms = params['drug_synonyms']
     fpkm_file = params['fpkm_file']
@@ -552,7 +556,7 @@ def write_out_constants(params):
         _LABEL_FILE = params['tuples_label_fold_out'].split("Data")[1] 
         _GENE_EXPRESSION_FILE = params['fpkm_file'].split("Data")[1]
         _LABEL_MATRIX_FILE = params['data_cleaned_out'].split("Data")[1]
-        _DRUG_DESCRIPTOR_FILE = params['descriptors'].split("Data")[1]
+        _DRUG_DESCRIPTOR_FILE = params['descriptor_out'].split("Data")[1]
         _MORGAN_FP_FILE = params['morgan_data_out'].split("Data")[1]
         fout.write("_LABEL_FILE = '{0}'".format(_LABEL_FILE) + '\n')
         fout.write("_GENE_EXPRESSION_FILE = '{0}'".format(_GENE_EXPRESSION_FILE) + '\n')
@@ -578,10 +582,11 @@ def candle_main(anl):
     run(params)
     if params['improve_analysis'] == 'yes' or anl:
         create_data_inputs(params)
+        download_author_data(params, data_dir)
         creating_drug_and_smiles_input(params['smiles_file'], params['drug_synonyms'])
         process_expression(params['tcga_file'], params['fpkm_file'])
         preprocess_gdsc(params)
-        generate_drug_descriptors(params['smiles_file'], params['anl_descriptors'])
+        generate_drug_descriptors(params['smiles_file'], params['descriptor_out'])
         generate_morganprint(params['smiles_file'], params['morgan_data_out'])
         generate_splits(params)
         write_out_constants(params)
