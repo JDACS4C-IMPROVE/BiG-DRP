@@ -130,7 +130,9 @@ def download_anl_data(params):
     splits_dir = os.path.join(csa_data_folder, 'splits') 
     x_data_dir = os.path.join(csa_data_folder, 'x_data')
     y_data_dir = os.path.join(csa_data_folder, 'y_data')
-
+    improve_data_url = params['improve_data_url']
+    data_type = params['data_type']
+    
     print("data downloaded dir is {0}".format(csa_data_folder))
     if not os.path.exists(csa_data_folder):
         print('creating folder: %s'%csa_data_folder)
@@ -144,12 +146,16 @@ def download_anl_data(params):
                          '_split_0_train.txt', '_split_0_val.txt']:
         url_dir = improve_data_url + "/splits/" 
         improve_file = data_type + files
+        data_file = url_dir + improve_file
+        print("downloading file: %s"%data_file)
         candle.file_utils.get_file(improve_file, url_dir + improve_file,
                                    datadir=splits_dir,
                                    cache_subdir=None)
 
     for improve_file in ['cancer_gene_expression.tsv', 'drug_SMILES.tsv','drug_ecfp4_nbits512.tsv' ]:
-        url_dir = improve_data_url + "/x_data/" 
+        url_dir = improve_data_url + "/x_data/"
+        data_file = url_dir + improve_file
+        print("downloading file: %s"%data_file)        
         candle.file_utils.get_file(fname=improve_file, origin=url_dir + improve_file,
                                    datadir=x_data_dir,
                                    cache_subdir=None)
@@ -162,6 +168,7 @@ def download_anl_data(params):
 
     
 def download_author_data(params, data_dir):
+    print("downloading file: %s"%params['data_url'])
     data_download_filepath = candle.get_file(params['original_data'], params['data_url'],
                                              datadir = data_dir,
                                              cache_subdir = None)
@@ -188,11 +195,15 @@ def create_data_inputs(params):
     binary_input = params['binary_input']
     data_type = params['data_type']
     metric = params['metric']
+    print(metric)
     auc_threshold = params['auc_threshold']
     rs = improve_utils.load_single_drug_response_data(source=data_type, split=0,
                                                       split_type=["train", "val", "test"],
                                                       y_col_name=metric)
     #generate binary file
+    rs = rs.drop_duplicates()
+    rs = rs.reset_index(drop=True)
+    rs = rs.groupby(['improve_chem_id', 'improve_sample_id']).mean().reset_index()
     rs_df = rs.pivot(index='improve_chem_id', columns='improve_sample_id', values=metric)
     rs_df = rs_df.reset_index()
     rs_tdf = rs_df.set_index("improve_chem_id")
@@ -238,6 +249,8 @@ def creating_drug_and_smiles_input(smiles_out, drug_synonyms_out):
     se['syn'] = syn_list
     drug_syn_df = se.drop(['smiles'], axis=1)
     drug_syn_df.to_csv(drug_synonyms_out, header=None)
+    print("smiles file downloaded and reformatted using improve utils {0} {1}".format(smiles_out,
+                                                                                      drug_synonyms_out)) 
 
 def filter_labels(df, syn, cells, drug_col):
     ## Check for rescreeens
@@ -402,7 +415,8 @@ def generate_drug_smiles(data_bin_cleaned_out, smiles_out):
     drugs_smiles.columns = ['smiles']
     OUTFILE = smiles_out
     drugs_smiles.to_csv(OUTFILE)
-
+    print("drug smiles file created at {0}".format(OUTFILE))
+    
 def get_splits(idx, n_folds):
     """
     idx: list of indices
@@ -483,14 +497,10 @@ def generate_splits(params):
     morgan_out = params['morgan_data_out']
     tuples_label_out = params['tuples_label_out']
     tuples_label_fold_out = params['tuples_label_fold_out']
-    print(expression_out)
-    print(data_bin_cleaned_out)
-    print(morgan_out)
     cells = pd.read_csv(expression_out
                         , index_col=0).columns
     labels = pd.read_csv(data_bin_cleaned_out, index_col=0)
     drugs = pd.read_csv(morgan_out, index_col=0)
-#    print(cells)
     orig_cells_gex = len(cells)
     orig_cells_lab = labels.shape[1]
     common = list(set(cells).intersection(set(labels.columns)))
@@ -581,6 +591,7 @@ def candle_main(anl):
     params =  preprocess(params, data_dir)
     run(params)
     if params['improve_analysis'] == 'yes' or anl:
+        download_anl_data(params)
         create_data_inputs(params)
         download_author_data(params, data_dir)
         creating_drug_and_smiles_input(params['smiles_file'], params['drug_synonyms'])
