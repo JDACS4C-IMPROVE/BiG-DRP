@@ -110,6 +110,25 @@ def create_dataset(tuples, train_x, val_x,
 
     return network, train_data, val_data, cell_lines, drug_feats
 
+def create_dataset_anl(tuples, train_x, val_x, 
+    train_y, val_y, drug_feats, percentile):
+    network = create_network(tuples, percentile)
+
+    train_data = TupleMatrixDataset( 
+        tuples,
+        torch.FloatTensor(train_x),
+        torch.FloatTensor(train_y))
+
+    val_data = TensorDataset(
+        torch.FloatTensor(val_x),
+        torch.FloatTensor(val_y))
+        #torch.FloatTensor(val_mask))
+
+    cell_lines = torch.FloatTensor(train_x)
+    drug_feats = torch.FloatTensor(drug_feats.values)
+
+    return network, train_data, val_data, cell_lines, drug_feats
+
 def nested_cross_validation(FLAGS, drug_feats, cell_lines, labels, label_matrix, normalizer):
     reset_seed(FLAGS.seed)
     hyperparams = {
@@ -229,6 +248,110 @@ def nested_cross_validation(FLAGS, drug_feats, cell_lines, labels, label_matrix,
         prediction_matrix.to_csv(FLAGS.outroot + "/results/" + FLAGS.folder + '/val_prediction_fold_%d.csv'%i)
     
     return final_metrics
+
+def anl_test_data(FLAGS, drug_feats, cell_lines, labels,
+                            label_matrix, normalizer, learning_rate, epoch, batch_size):
+    reset_seed(seed)
+    hyperparams = {
+        'learning_rate': learning_rate,
+        'num_epoch': epoch,
+        'batch_size': batch_size,
+        'common_dim': 512,
+        'expr_enc': 1024,
+        'conv1': 512,
+        'conv2': 512,
+        'mid': 512,
+        'drop': 1}
+
+    label_matrix = label_matrix.replace(np.nan, 0)
+    hp = hyperparams.copy()
+    final_metrics = None
+    drug_list = list(drug_feats.index)
+    train_tuples = labels.loc[labels['cl_fold'] == 1]
+    train_tuples = labels
+    train_samples = list(train_tuples['cell_line'].unique())
+    train_x = cell_lines.loc[train_samples].values
+    train_y = label_matrix.loc[train_samples].values
+    #train_mask = (label_mask.loc[train_samples].isin(train_folds))*1
+    #train_mask = label_mask.loc[train_samples]*1
+    val_tuples = labels.loc[labels['cl_fold'] == 2]
+    val_samples = list(val_tuples['cell_line'].unique())
+    val_x = cell_lines.loc[val_samples].values
+    val_y = label_matrix.loc[val_samples].values
+    #val_mask = ((label_mask.loc[val_samples]==val_fold)*1).values
+    #val_mask = (label_mask.loc[val_samples]*1).values
+    train_tuples = train_tuples[['drug', 'cell_line', 'response']]
+    train_tuples = reindex_tuples(train_tuples, drug_list, train_samples) # all drugs exist in all folds
+
+    train_x, val_x = normalizer(train_x, val_x)
+    network, train_data, val_data, cl_tensor, df_tensor = create_dataset_anl(train_tuples, 
+                                                                             train_x, val_x, 
+                                                                             train_y, val_y,                                                                    
+                                                                             drug_feats, 
+                                                                             FLAGS.network_perc)
+
+    val_error,_,_ = fold_validation(hp, FLAGS.seed, network, 
+                                    train_data, val_data, 
+                                    cl_tensor, df_tensor,
+                                    tuning=False, 
+                                    epoch=hp['num_epoch'], maxout=False)
+
+    average_over = 3
+    mov_av = moving_average(val_error[:,0], average_over)
+    smooth_val_loss = np.pad(mov_av, average_over//2, mode='edge')
+    epoch = np.argmin(smooth_val_loss)
+    hp['num_epoch'] = int(max(epoch, 2)) 
+    print(smooth_val_loss)
+
+        # === actual test fold ===
+
+    #train_folds = train_folds + [val_fold]
+    train_tuples = labels.loc[labels['cl_fold'] == 1]
+    train_samples = list(train_tuples['cell_line'].unique())
+    train_x = cell_lines.loc[train_samples].values
+    train_y = label_matrix.loc[train_samples].values
+    #train_mask = (label_mask.loc[train_samples].isin(train_folds))*1
+
+    test_tuples = labels.loc[labels['cl_fold'] == 3]
+    test_samples = list(test_tuples['cell_line'].unique())
+    test_x = cell_lines.loc[test_samples].values
+    test_y = label_matrix.loc[test_samples].values
+    #test_mask = (label_mask.loc[test_samples]==test_fold)*1
+
+    train_tuples = train_tuples[['drug', 'cell_line', 'response']]
+    train_tuples = reindex_tuples(train_tuples, drug_list, train_samples) # all drugs exist in all folds
+
+    train_x, test_x = normalizer(train_x, test_x)
+    network, train_data, test_data, cl_tensor, df_tensor = create_dataset_anl(train_tuples, 
+                                                                              train_x, test_x, 
+                                                                              train_y, test_y, 
+                                                                              drug_feats, FLAGS.network_perc)
+
+    test_error, trainer, metric_names = fold_validation(hp, FLAGS.seed, network, 
+                                                        train_data, 
+                                                        test_data, cl_tensor, df_tensor, tuning=False, 
+                                                        epoch=hp['num_epoch'], maxout=True) # set maxout so that the trainer uses all epochs
+
+    test_metrics = pd.DataFrame(test_error, columns=metric_names)
+    test_metrics.to_csv(FLAGS.outroot + "/results/" + FLAGS.folder + '/fold_%d.csv', index=False)
+
+    drug_enc = trainer.get_drug_encoding().cpu().detach().numpy()
+    pd.DataFrame(drug_enc, index=drug_list).to_csv(FLAGS.outroot + "/results/" + FLAGS.folder + '/encoding_fold_%d.csv')
+
+    trainer.save_model(FLAGS.outroot + "/results/" + FLAGS.folder, hp)
+
+        # save predictions
+    test_data = TensorDataset(torch.FloatTensor(test_x))
+    test_data = DataLoader(test_data, batch_size=hyperparams['batch_size'], shuffle=False)
+
+    prediction_matrix = trainer.predict_matrix(test_data, drug_encoding=torch.Tensor(drug_enc))
+    prediction_matrix = pd.DataFrame(prediction_matrix, index=test_samples, columns=drug_list)
+
+
+    prediction_matrix.to_csv(FLAGS.outroot + "/results/val_prediction_fold_%d.csv")
+    
+    return final_metrics
+
 
 def main(FLAGS):
     print(FLAGS)
