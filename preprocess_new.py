@@ -40,7 +40,7 @@ required=None
 additional_definitions=None
 
 # This should be set outside as a user environment variable
-os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/'
+#os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/'
 
 #parent path
 fdir = Path('__file__').resolve().parent
@@ -83,23 +83,25 @@ def preprocess(params, data_dir):
     preprocessed_dir = data_dir + "/preprocessed"
     drug_feature_dir = data_dir + "/drp-data/grl-preprocessed/drug_features/"
     drug_response_dir = data_dir + "/drp-data/grl-preprocessed/drug_response/"
-    sanger_tcga_dir = data_dir + "/drp-data/grl-preprocessed/sanger_tcga/"    
+    sanger_tcga_dir = data_dir + "/drp-data/grl-preprocessed/sanger_tcga/"
+    cross_study = data_dir + "/cross_study"
     mkdir(drug_feature_dir)
     mkdir(drug_response_dir)
     mkdir(sanger_tcga_dir)
     mkdir(preprocessed_dir)
-
+    mkdir(cross_study)
     args = candle.ArgumentStruct(**params)
     drug_synonym_file = data_dir + "/" + params['drug_synonyms']
     gene_expression_file = sanger_tcga_dir + "/" + params['expression_out']
     ln50_file = data_dir + "/" + params['data_file']
     model_label_file = data_dir + "/" + params['binary_file']
-    tcga_file =  data_dir +'/BiG_DRP_data/' + 'supplementary/' + params['tcga_file']
+    tcga_file =  data_dir  + 'supplementary/' + params['tcga_file']
     data_bin_cleaned_out = drug_feature_dir + params['data_bin_cleaned_out']
     data_cleaned_out = drug_response_dir + params['data_cleaned_out']
     data_tuples_out = drug_response_dir + params['data_tuples_out']
     tuples_label_fold_out = drug_response_dir + params['labels']
     smiles_file = data_dir + params['smiles_file']
+    params['cross_study'] = cross_study
     params['data_bin_cleaned_out'] = data_bin_cleaned_out
     params['data_input'] = data_dir + "/" + params['data_file']
     params['binary_input'] = data_dir + "/" + params['binary_file']
@@ -117,7 +119,7 @@ def preprocess(params, data_dir):
     params['folder'] = params['outroot']
     params['outroot'] = params['outroot']
     params['network_perc'] = params['network_percentile']
-    params['drug_feat'] = params['drug_feature']
+    params['drug_feat'] = params['drug_feat']
     params['drug_synonyms'] = drug_synonym_file
     params['data_bin_cleaned_out'] = data_bin_cleaned_out
     params['data_cleaned_out'] = data_cleaned_out
@@ -126,13 +128,13 @@ def preprocess(params, data_dir):
     return(params)
 
 def download_anl_data(params):
-    csa_data_folder = os.path.join(os.environ['CANDLE_DATA_DIR'] + params['model_name'], 'csa_data', 'raw_data')
+    csa_data_folder = os.path.join(os.environ['CANDLE_DATA_DIR'], 'csa_data', 'raw_data')
     splits_dir = os.path.join(csa_data_folder, 'splits') 
     x_data_dir = os.path.join(csa_data_folder, 'x_data')
     y_data_dir = os.path.join(csa_data_folder, 'y_data')
     improve_data_url = params['improve_data_url']
     data_type = params['data_type']
-    
+    data_type_list = data_type.split(",")
     print("data downloaded dir is {0}".format(csa_data_folder))
     if not os.path.exists(csa_data_folder):
         print('creating folder: %s'%csa_data_folder)
@@ -143,14 +145,15 @@ def download_anl_data(params):
     
 
     for files in ['_all.txt', '_split_0_test.txt',
-                         '_split_0_train.txt', '_split_0_val.txt']:
-        url_dir = improve_data_url + "/splits/" 
-        improve_file = data_type + files
-        data_file = url_dir + improve_file
-        print("downloading file: %s"%data_file)
-        candle.file_utils.get_file(improve_file, url_dir + improve_file,
-                                   datadir=splits_dir,
-                                   cache_subdir=None)
+                  '_split_0_train.txt', '_split_0_val.txt']:
+        url_dir = improve_data_url + "/splits/"
+        for dt in data_type_list:
+            improve_file = dt + files
+            data_file = url_dir + improve_file
+            print("downloading file: %s"%data_file)
+            candle.file_utils.get_file(improve_file, url_dir + improve_file,
+                                       datadir=splits_dir,
+                                       cache_subdir=None)
 
     for improve_file in ['cancer_gene_expression.tsv', 'drug_SMILES.tsv','drug_ecfp4_nbits512.tsv' ]:
         url_dir = improve_data_url + "/x_data/"
@@ -189,22 +192,10 @@ def convert_to_binary(x):
     else:
         return ""
 
-    
-def create_data_inputs(params):
-    data_input = params['data_input']
-    binary_input = params['binary_input']
-    data_type = params['data_type']
+
+def create_big_drp_data(df, data_dir, split_type, params):
     metric = params['metric']
-    print(metric)
-    auc_threshold = params['auc_threshold']
-    rs = improve_utils.load_single_drug_response_data(source=data_type, split=0,
-                                                      split_type=["train", "val", "test"],
-                                                      y_col_name=metric)
-    #generate binary file
-    rs = rs.drop_duplicates()
-    rs = rs.reset_index(drop=True)
-    rs = rs.groupby(['improve_chem_id', 'improve_sample_id']).mean().reset_index()
-    rs_df = rs.pivot(index='improve_chem_id', columns='improve_sample_id', values=metric)
+    rs_df = df.pivot_table(index='improve_chem_id', columns='improve_sample_id', values=metric, aggfunc='mean')
     rs_df = rs_df.reset_index()
     rs_tdf = rs_df.set_index("improve_chem_id")
     rs_tdf = rs_tdf.T
@@ -216,11 +207,82 @@ def create_data_inputs(params):
     rs_binary_df.loc['threshold'] = thesholds
     rs_binary_df = rs_binary_df.reset_index()
     rs_binary_df = rs_binary_df.apply(np.roll, shift=1)
+    binary_file = 'binary_' + split_type + "_file"
+    binary_input=data_dir + params[binary_file]
     rs_binary_df.to_csv(binary_input, index=None)
     rs_tdf = rs_tdf.reset_index()
     rs_tdf = rs_tdf.rename({'compounds': "sample_names"},axis=1)
+    ic50_file = 'data_' + split_type + "_file"    
+    data_input = data_dir + params[ic50_file]
     rs_tdf.to_csv(data_input, index_label="improve_id")
-   
+
+    
+def create_data_inputs(params, data_dir):
+    data_input = params['data_input']
+    binary_input = params['binary_input']
+    train_data_type = params['train_data_type']
+    metric = params['metric']
+    auc_threshold = params['auc_threshold']
+    data_type =  params['train_data_type']
+    rs = improve_utils.load_single_drug_response_data(source=data_type, split=0,
+                                                      split_type=["train", "val", "test"],
+                                                      y_col_name=metric)
+
+    rs_train = improve_utils.load_single_drug_response_data(source=data_type, split=0,
+                                                      split_type=["train"],
+                                                      y_col_name=metric)
+
+    rs_val = improve_utils.load_single_drug_response_data(source=data_type, split=0,
+                                                      split_type=["val"],
+                                                      y_col_name=metric)
+
+    rs_test = improve_utils.load_single_drug_response_data(source=data_type, split=0,
+                                                      split_type=["test"],
+                                                      y_col_name=metric)
+    create_big_drp_data(rs_train, data_dir, "train", params)
+    create_big_drp_data(rs_val, data_dir, "val", params)
+    create_big_drp_data(rs_test, data_dir, "test", params)    
+    
+
+    
+def cross_study_test_data(params):
+    data_input = params['data_input']
+    binary_input = params['binary_input']
+    data_type = params['data_type']
+    metric = params['metric']
+    auc_threshold = params['auc_threshold']
+    cross_study_dir = params['cross_study']
+    metric = params['metric']
+    auc_threshold = params['auc_threshold']
+    cross_study_list =  data_type.split(',')
+    
+    for i in cross_study_list:
+        data_out = cross_study_dir + '/' + i + "_test.csv"
+        binary_out =  cross_study_dir + '/' + i + "binary_test.csv"
+        rs = improve_utils.load_single_drug_response_data(source=i, split=0,
+                                                      split_type=["test"],
+                                                      y_col_name=metric)
+        rs = rs.drop_duplicates()
+        rs = rs.reset_index(drop=True)
+        rs = rs.groupby(['improve_chem_id', 'improve_sample_id']).mean().reset_index()
+        rs_df = rs.pivot(index='improve_chem_id', columns='improve_sample_id', values=metric)
+        rs_df = rs_df.reset_index()
+        rs_tdf = rs_df.set_index("improve_chem_id")
+        rs_tdf = rs_tdf.T
+        rs_binary_df = rs_tdf.applymap(convert_to_binary)
+        rep = len(rs_binary_df.columns)
+        rs_binary_df.index.names = ['compounds']
+        thesholds = np.repeat([auc_threshold],rep)
+        thesholds = list(thesholds)
+        rs_binary_df.loc['threshold'] = thesholds
+        rs_binary_df = rs_binary_df.reset_index()
+        rs_binary_df = rs_binary_df.apply(np.roll, shift=1)
+        rs_binary_df.to_csv(binary_out, index=None)
+        rs_tdf = rs_tdf.reset_index()
+        rs_tdf = rs_tdf.rename({'compounds': "sample_names"},axis=1)
+        rs_tdf.to_csv(data_out, index_label="improve_id")
+
+        
 def process_expression(tcga_file, expression_out):
     ge = improve_utils.load_gene_expression_data(gene_system_identifier="Ensembl")
     expression_tdf = ge.dropna()
@@ -297,66 +359,147 @@ def filter_labels(df, syn, cells, drug_col):
     df = df.loc[df.index!='improve_id']
     return df
 
-def preprocess_gdsc(params):
-    ic50_file = params['data_input']
-    binary_file = params['binary_input']
+def preprocess_data(params, data_dir):
+#    ic50_file = params['data_input']
+#    binary_file = params['binary_input']
+    split_type = ['train', 'val', 'test']
     drug_synonyms = params['drug_synonyms']
     fpkm_file = params['fpkm_file']
-    data_cleaned_out = params['data_cleaned_out']
-    data_bin_cleaned_out = params['data_bin_cleaned_out']
-    data_tuples_out = params['data_tuples_out']
     syn = pd.read_csv(drug_synonyms, header=None)
-    cells = pd.read_csv(fpkm_file, index_col=0).columns
-    lnic50 = pd.read_csv(ic50_file, index_col=1, header=None)                                                 
-    cells = lnic50.index[1:]
-    df = lnic50.T
-    df = filter_labels(df, syn, cells, drug_col='sample_names')
-    df = df.sort_index()[cells]
-    df.to_csv(data_cleaned_out)
-    print("Data matrix size:", df.shape)
-    drugs = list(df.index)
+    fpkm = pd.read_csv(fpkm_file, index_col=0).columns
+    data_clean=[]
+    data_clean_out = params['data_cleaned_out']
+    for dt in split_type:
+        binary_data = 'binary_' + dt + "_file"
+        binary_file = data_dir + params[binary_data]
+        ic50_data = 'data_' + dt + "_file"
+        ic50_file = data_dir + params[ic50_data]
+        data_cleaned_data = "data_cleaned_" + dt + "_out" 
+        data_cleaned_out = data_dir + params[data_cleaned_data]
+        data_bin_cleaned_data = "data_bin_cleaned_" + dt + "_out"
+        data_bin_cleaned_out = data_dir + params[data_bin_cleaned_data]
+        data_tuples_data = "data_tuples_" + dt + "_out"
+        data_tuples_out = data_dir + params[data_tuples_data]
+        lnic50 = pd.read_csv(ic50_file, index_col=1, header=None)                                                 
+        cells = lnic50.index[1:]
+        df = lnic50.T
+        df = filter_labels(df, syn, cells, drug_col='sample_names')
+        df = df.sort_index()[cells]
+#        df.to_csv(data_cleaned_out)
+        data_clean.append(df)
+        print("Data matrix size:", df.shape)
+        drugs = list(df.index)
 
-    # BINARIZED DATA                                                                                                                        
-    print("\n\nProcessing binarized data...")
-    bin_data = pd.read_csv(binary_file, index_col=0, header=None)
-    bin_data.loc['compounds'] = bin_data.loc['compounds']#.str.lower()
-    bin_data = bin_data.T
-    print("BIN: cells match?", len(cells.intersection(bin_data.columns))==len(cells))
-    bin_data = filter_labels(bin_data, syn, cells, drug_col='compounds')
-    reps = {
+        # BINARIZED DATA                                                                                                                        
+        print("\n\nProcessing binarized data...")
+        bin_data = pd.read_csv(binary_file, index_col=0, header=None)
+        bin_data.loc['compounds'] = bin_data.loc['compounds']#.str.lower()
+        bin_data = bin_data.T
+        print("BIN: cells match?", len(cells.intersection(bin_data.columns))==len(cells))
+        bin_data = filter_labels(bin_data, syn, cells, drug_col='compounds')
+        reps = {
             'R': 1,
             'R ': 1,
             'S': 0,
             'S ': 0
-    }
-    bin_data = bin_data.replace(reps)
-    bin_data = bin_data.sort_index()[cells]
-    OUTFILE = data_bin_cleaned_out
-    bin_data.to_csv(OUTFILE)
-    print("Generated cleaned bin file {0}".format(OUTFILE))
-    print("Binarized matrix size:", bin_data.shape)
+        }
+        bin_data = bin_data.replace(reps)
+        bin_data = bin_data.sort_index()[cells]
+        OUTFILE = data_bin_cleaned_out
+        bin_data.to_csv(OUTFILE)
+        print("Generated cleaned bin file {0}".format(OUTFILE))
+        print("Binarized matrix size:", bin_data.shape)
+        
 
+        # TUPLE DATA                                                                                                                            
+        print("Processing tuple data...")
+        tuples = pd.DataFrame(columns=['drug', 'improve_id', 'cell_line', 'response', 'resistant'])
+        idx = np.transpose((1-np.isnan(np.asarray(df.values, dtype=float))).nonzero())
+        
+        print("num tuples:",  len(idx))
+        i = 0
+        for drug, cl in tqdm(idx):
+            x = {'drug': drugs[drug],
+                 'improve_id': lnic50.loc[cells[cl]][0],
+                 'cell_line': cells[cl],
+                 'response': df.loc[drugs[drug], cells[cl]],
+                 'resistant': bin_data.loc[drugs[drug], cells[cl]]}
+            tuples.loc[i] = x
+            i += 1
+        OUTFILE = data_tuples_out
+#        print(tuples)
+        tuples.to_csv(OUTFILE)
+        print("Generated tuple labels {0}".format(OUTFILE))
+    final_dataframe = pd.concat(data_clean)
+    print(final_dataframe)
+    final_dataframe.to_csv(data_clean_out)
+    
+def preprocess_cross_study_data(params):
+#    ic50_file = params['data_input']
+#    binary_file = params['binary_input']
+    cross_study_dir =  params['cross_study']
+    data_types =  params['data_type']
+    drug_synonyms = params['drug_synonyms']
+    fpkm_file = params['fpkm_file']
+#    data_cleaned_out = params['data_cleaned_out']
+#    data_bin_cleaned_out = params['data_bin_cleaned_out']
+#    data_tuples_out = params['data_tuples_out']
+    syn = pd.read_csv(drug_synonyms, header=None)
+    cells = pd.read_csv(fpkm_file, index_col=0).columns
+    data_type_list = data_types.split(',')
+    for dt in data_type_list:
+        ic50_file = cross_study_dir + "/" + dt + "_test.csv"
+        binary_file = cross_study_dir + "/" + dt + "binary_test.csv"
+        cleaned_outfile = cross_study_dir + "/" + dt + "_cleaned_test.csv"
+        bin_cleaned_outfile = cross_study_dir + "/" + dt + "_bincleaned_test.csv"
+        tuples_out = cross_study_dir + "/" + dt + "_tuples_test.csv"
+        lnic50 = pd.read_csv(ic50_file, index_col=1, header=None)                                                 
+        cells = lnic50.index[1:]
+        df = lnic50.T
+        df = filter_labels(df, syn, cells, drug_col='sample_names')
+        df = df.sort_index()[cells]
+        df.to_csv(cleaned_outfile)
+        print("Data matrix size:", df.shape)
+        drugs = list(df.index)
+        # BINARIZED DATA                                                                                      
+        print("\n\nProcessing binarized data...")
+        bin_data = pd.read_csv(binary_file, index_col=0, header=None)
+        bin_data.loc['compounds'] = bin_data.loc['compounds']#.str.lower()
+        bin_data = bin_data.T
+        print("BIN: cells match?", len(cells.intersection(bin_data.columns))==len(cells))
+        bin_data = filter_labels(bin_data, syn, cells, drug_col='compounds')
+        reps = {
+            'R': 1,
+            'R ': 1,
+            'S': 0,
+            'S ': 0
+        }
+        bin_data = bin_data.replace(reps)
+        bin_data = bin_data.sort_index()[cells]
+        bin_data.to_csv(bin_cleaned_outfile)
+        print("Generated cleaned bin file {0}".format(bin_cleaned_outfile))
+        print("Binarized matrix size:", bin_data.shape)
 
-    # TUPLE DATA                                                                                                                            
-    print("Processing tuple data...")
-    tuples = pd.DataFrame(columns=['drug', 'improve_id', 'cell_line', 'response', 'resistant'])
-    idx = np.transpose((1-np.isnan(np.asarray(df.values, dtype=float))).nonzero())
+        # TUPLE DATA                                                                                            
+        print("Processing tuple data...")
+        tuples = pd.DataFrame(columns=['drug', 'improve_id', 'cell_line', 'response', 'resistant'])
+        idx = np.transpose((1-np.isnan(np.asarray(df.values, dtype=float))).nonzero())
 
-    print("num tuples:",  len(idx))
-    i = 0
-    for drug, cl in tqdm(idx):
-        #print(drug)
-        x = {'drug': drugs[drug],
-            'improve_id': lnic50.loc[cells[cl]][0],
-            'cell_line': cells[cl],
-            'response': df.loc[drugs[drug], cells[cl]],
-            'resistant': bin_data.loc[drugs[drug], cells[cl]]}
-        tuples.loc[i] = x
-        i += 1
-    OUTFILE = data_tuples_out
-    tuples.to_csv(OUTFILE)
-    print("Generated tuple labels {0}".format(OUTFILE))
+        print("num tuples:",  len(idx))
+        i = 0
+        for drug, cl in tqdm(idx):
+            x = {'drug': drugs[drug],
+                 'improve_id': lnic50.loc[cells[cl]][0],
+                 'cell_line': cells[cl],
+                 'response': df.loc[drugs[drug], cells[cl]],
+                 'resistant': bin_data.loc[drugs[drug], cells[cl]]}
+            tuples.loc[i] = x
+            i += 1
+        OUTFILE = tuples_out
+        tuples.to_csv(OUTFILE)
+        print("Generated tuple labels {0}".format(OUTFILE))
 
+    
 def generate_drug_descriptors(smiles_file, descriptor_out):
     OUTFILE = descriptor_out
 
@@ -491,73 +634,80 @@ def leave_pairs_out(tuples, drugs):
     return tuples
 
 
-def generate_splits(params):
+def generate_splits_anl(params, data_dir):
     expression_out = params['fpkm_file']
-    data_bin_cleaned_out = params['data_bin_cleaned_out']
+    split_type = ['train', 'val', 'test']
     morgan_out = params['morgan_data_out']
-    tuples_label_out = params['tuples_label_out']
-    tuples_label_fold_out = params['tuples_label_fold_out']
-    cells = pd.read_csv(expression_out
-                        , index_col=0).columns
-    labels = pd.read_csv(data_bin_cleaned_out, index_col=0)
+    cells = pd.read_csv(expression_out, index_col=0).columns
     drugs = pd.read_csv(morgan_out, index_col=0)
     orig_cells_gex = len(cells)
-    orig_cells_lab = labels.shape[1]
-    common = list(set(cells).intersection(set(labels.columns)))
-    labels = labels[common] # (drugs x cells)
-
-    drug_list = labels.index.tolist()
-    drug_out =  params['drug_out'] 
-    with open(drug_out, "w+") as fout:
-        for i in drug_list:
-            fout.write(i +'\n')
+    count = 0
+    dataframes_list = []
+    tuples_label_fold_out = params['tuples_label_fold_out']
+    for dt in split_type:
+        count +=  1
+        data_bin_cleaned_out = data_dir + "/BiG_DRP_data_cleaned." + dt + ".csv"
+        tuples_labels_out = data_dir + "/BiG_DRP_data_tuples." + dt + ".csv"
+        labels = pd.read_csv(data_bin_cleaned_out, index_col=0)
+#        print(labels)
+        orig_cells_lab = labels.shape[1]
+        common = list(set(cells).intersection(set(labels.columns)))
+        labels = labels[common] # (drugs x cells)
+#        print(labels)
+        drug_list = labels.index.tolist()
+        drug_out =  params['drug_out'] 
+        with open(drug_out, "w+") as fout:
+            for i in drug_list:
+                fout.write(i +'\n')
             
-    #print(drug_list)
-    print('original cells (GEX): %d'%(orig_cells_gex))
-    print('original cells (labels): %d'%(orig_cells_lab))
-    print('current cells: %d'%len(common) )
-    orig_drugs = len(drugs)
-    drugs = drugs.dropna().index
-    #print(drugs)
-    #print(labels.loc[drug_list])
-    labels = labels.loc[drug_list]
+        print('original cells (GEX): %d'%(orig_cells_gex))
+        print('original cells (labels): %d'%(orig_cells_lab))
+        print('current cells: %d'%len(common) )
+        orig_drugs = len(drugs)
+        drugs = drugs.dropna()
+        labels = labels.loc[drug_list]
 
-    print('original drugs: %d'%(orig_drugs))
-    print('current drugs: %d (dropped %d)'%(len(drugs), orig_drugs-len(drugs)))
+        print('original drugs: %d'%(orig_drugs))
+        print('current drugs: %d (dropped %d)'%(len(drugs), orig_drugs-len(drugs)))
 
-    print("Doing leave cell lines out splits...")
-    lco = leave_cells_out(labels, common, cells)
+        print("Doing leave cell lines out splits...")
+ #       lco = leave_cells_out(labels, common, cells)
 
-    ### leave pairs
+        ### leave pairs
 
-    labels = labels[common].T
+        labels = labels[common].T
 
-    print('current cells: %d'%len(labels.index) )
+        print('current cells: %d'%len(labels.index) )
 
-    tuples = pd.read_csv(tuples_label_out, index_col=0)
-    tuples['resistant'] = tuples['resistant'].astype(int)
-    tuples['sensitive'] = (tuples['resistant'] + 1)%2
-    # remove tuples that don't have drug or cell line data
-    tuples = tuples.loc[tuples['drug'].isin(drugs)].loc[tuples['cell_line'].isin(labels.index)] 
+        tuples = pd.read_csv(tuples_labels_out, index_col=0)
+        print(tuples_labels_out)
+        tuples['resistant'] = tuples['resistant'].astype(int)
+        tuples['sensitive'] = (tuples['resistant'] + 1)%2
+        # remove tuples that don't have drug or cell line data
+        
+#        tuples = tuples.loc[tuples['drug'].isin(drugs)].loc[tuples['cell_line'].isin(labels.index)] 
+        print("number of tuples before filter:", tuples.shape[0])
+        print("removed cell lines with < 3 drugs tested...")
+        labels = labels.loc[labels.notna().sum(axis=1) > 2]
+#        lpo_tuples = tuples.loc[tuples['cell_line'].isin(labels.index)].copy()
+#        print("number of tuples after filter:", lpo_tuples.shape[0])
+#        lpo = leave_pairs_out(lpo_tuples, drugs)
+        df = tuples.copy()
+        df['cl_fold'] = count
+#        df.at[lpo.index, 'pair_fold'] = lpo['pair_fold']
+ #       df['cl_fold'] = np.zeros(len(df), dtype=int)
 
-    print("number of tuples before filter:", tuples.shape[0])
-    print("removed cell lines with < 3 drugs tested...")
-    labels = labels.loc[labels.notna().sum(axis=1) > 2]
-    lpo_tuples = tuples.loc[tuples['cell_line'].isin(labels.index)].copy()
-    print("number of tuples after filter:", lpo_tuples.shape[0])
+#        for i in range(lco['fold'].max()+1):
+#            cells_in_fold = lco.loc[lco['fold']==i].index
+#            df.loc[df['cell_line'].isin(cells_in_fold), 'cl_fold'] = i
 
-    lpo = leave_pairs_out(lpo_tuples, drugs)
-    df = tuples.copy()
-    df.at[lpo.index, 'pair_fold'] = lpo['pair_fold']
-    df['cl_fold'] = np.zeros(len(df), dtype=int)
+        df.index = range(len(df))
+ #       df['pair_fold'] = df['pair_fold'].replace(np.nan, -1).astype(int)
+        dataframes_list.append(df)
 
-    for i in range(lco['fold'].max()+1):
-        cells_in_fold = lco.loc[lco['fold']==i].index
-        df.loc[df['cell_line'].isin(cells_in_fold), 'cl_fold'] = i
-
-    df.index = range(len(df))
-    df['pair_fold'] = df['pair_fold'].replace(np.nan, -1).astype(int)
-    df.to_csv(tuples_label_fold_out)
+    final_dataframe = pd.concat(dataframes_list, ignore_index=True)
+    print(tuples_label_fold_out)
+    final_dataframe.to_csv(tuples_label_fold_out)
     
 
 def write_out_constants(params):
@@ -587,19 +737,20 @@ def run(params):
     
 def candle_main(anl):
     params = initialize_parameters()
-    data_dir = os.environ['CANDLE_DATA_DIR'] + params['model_name'] + "/Data/BiG_DRP_data/"
+    data_dir = os.environ['CANDLE_DATA_DIR'] + "/Data/"
     params =  preprocess(params, data_dir)
-    run(params)
     if params['improve_analysis'] == 'yes' or anl:
         download_anl_data(params)
-        create_data_inputs(params)
-        download_author_data(params, data_dir)
+        create_data_inputs(params, data_dir)
+        cross_study_test_data(params)
         creating_drug_and_smiles_input(params['smiles_file'], params['drug_synonyms'])
+        download_author_data(params, data_dir) 
         process_expression(params['tcga_file'], params['fpkm_file'])
-        preprocess_gdsc(params)
+        preprocess_data(params, data_dir)
+        preprocess_cross_study_data(params)
         generate_drug_descriptors(params['smiles_file'], params['descriptor_out'])
         generate_morganprint(params['smiles_file'], params['morgan_data_out'])
-        generate_splits(params)
+        generate_splits_anl(params, data_dir)
         write_out_constants(params)
     else:
         download_author_data(params, data_dir)

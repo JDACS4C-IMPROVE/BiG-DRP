@@ -1,5 +1,6 @@
 import torch
 from sklearn.metrics import r2_score
+import os
 from bigdrp.model import BiGDRP
 import time
 import numpy as np
@@ -85,6 +86,40 @@ class Trainer:
 
         return val_loss.item()/len(ys), r2, pearson, spearman
 
+    def validation_step_cellwise_anl(self, val_loader, device):
+        """
+        Creates a matrix of predictions with shape (n_cell_lines, n_drugs) and calculates the metrics
+        """
+
+        self.model.eval()
+
+        val_loss = 0
+        preds = []
+        ys = []
+        with torch.no_grad():
+            for (x, y) in val_loader:
+                x, y = x.to(device), y.to(device)
+                x_shape = x.shape
+                y_shape = y.shape
+                pred = self.model.predict_all(self.blocks, self.drug_feats, self.cell_feats, x)
+                val_score = (pred - y)**2
+                val_loss += val_score.mean()  # Use the mean squared error as the loss
+
+                ys.append(y.cpu().detach().numpy())
+                preds.append(pred.cpu().detach().numpy())
+
+        ys = np.concatenate(ys, axis=0)
+        preds = np.concatenate(preds, axis=0)
+        min_rows = min(ys.shape[0], preds.shape[0])
+        ys = ys[:min_rows]
+        preds = preds[:min_rows]
+
+        r2 = r2_score(ys, preds)
+        pearson = pearsonr(ys.flatten(), preds.flatten())[0]
+        spearman = spearmanr(ys.flatten(), preds.flatten())[0]
+
+        return val_loss.item() / len(ys), r2,pearson, spearman
+
     def get_drug_encoding(self):
         """
         returns the tensor of drug encodings (by GraphConv])
@@ -132,7 +167,7 @@ class Trainer:
 
         for epoch in range(num_epoch):
             train_metrics = self.train_step(train_loader, self.device)
-            val_metrics = self.validation_step_cellwise(val_loader, self.device)
+            val_metrics = self.validation_step_cellwise_anl(val_loader, self.device)
 
             ret_matrix[epoch,:4] = val_metrics
             ret_matrix[epoch,4:] = train_metrics
@@ -164,6 +199,64 @@ class Trainer:
         metric_names = ['test MSE', 'test R^2', 'test pearsonr', 'test spearmanr', 'train MSE', 'train R^2']
         return ret_matrix, metric_names
 
+    def fit_anl(self, num_epoch, train_loader, val_loader, tuning=False, maxout=False):
+        start_time = time.time()
+
+        ret_matrix = np.zeros((num_epoch, 6))
+        loss_deque = deque([], maxlen=5)
+
+        best_loss = np.inf
+        best_loss_avg5 = np.inf
+        best_loss_epoch = 0
+        best_avg5_loss_epoch = 0
+
+        count = 0
+
+        for epoch in range(num_epoch):
+            train_metrics = self.train_step(train_loader, self.device)
+            val_metrics = self.validation_step_cellwise_anl(val_loader, self.device)
+
+            #ret_matrix[epoch, :4] = val_metrics
+            ret_matrix[epoch, :4] = val_metrics
+            ret_matrix[epoch, 4:] = train_metrics
+
+            if best_loss > val_metrics[0]:
+                best_loss = val_metrics[0]
+                best_loss_epoch = epoch+1
+
+            loss_deque.append(val_metrics[0])
+            loss_avg5 = sum(loss_deque)/len(loss_deque)
+            
+            if best_loss_avg5 > loss_avg5:
+                best_loss_avg5 = loss_avg5
+                best_avg5_loss_epoch = epoch+1
+                count = 0
+            else:
+                count += 1
+
+            if count == 10 and not maxout:
+                ret_matrix = ret_matrix[:epoch+1]
+                break
+
+            elapsed_time = time.time() - start_time
+            start_time = time.time()
+            print("%d\tval-mse:%.4f\tbatch-mse:%.4f\tval-r2:%.4f\tbatch-r2:%.4f\tval-spearman:%.4f\t%ds"%(
+                epoch+1, val_metrics[0], train_metrics[0],val_metrics[1], train_metrics[1], val_metrics[3], int(elapsed_time)))
+
+            metric_names = ['test MSE', 'test R^2', 'test pearsonr', 'test spearmanr', 'train MSE', 'train R^2']
+            return ret_matrix, metric_names
+    
+    def save_anl_model(self, directory, hyp):
+        os.makedirs(directory, exist_ok=True)
+        model_weights_path = os.path.join(directory, f'model_weights_fold_anl.pt')
+        torch.save(self.model.state_dict(), model_weights_path)
+
+        # Save hyperparameters as JSON
+        hyp_path = os.path.join(directory, f'model_config_fold.txt')
+        with open(hyp_path, "w") as f:
+            json.dump(hyp, f)
+
+    
     def save_model(self, directory, fold_id, hyp):
         torch.save(self.model.state_dict(), directory+'/model_weights_fold_%d'%fold_id)
 
