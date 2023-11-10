@@ -30,7 +30,7 @@ conda env create -f Big-DRP_conda.yml
 **Activate the environment**
 
 ```
-conda activatepython_BigDRP
+conda activate python_BigDRP
 ```
 
 **Download BiG-DRP**
@@ -127,22 +127,21 @@ Note: The train.sh script will download the original authors data if the Data di
 ## Example
 
    * git clone ....
-   * cd DrugCell
-   * mkdir Data
+   * cd BiG-DRP
    * check permissions if all scripts are executable
-   * ./preprocess.sh 2 ./Data
-   * ./train.sh 2 ./Data
-   * ./infer.sh 2 ./Data
+   * ./preprocess.sh 2 $CANDLE_DATA_DIR
+   * ./train.sh 2 $CANDLE_DATA_DIR
+   * ./infer.sh 2 $CANDLE_DATA_DIR
 
 
 ## REQUIREMENTS
 
-** pandas==1.1.2
-** six==1.15.0
-** scipy==1.6.2
-** tqdm==4.60.0
-** nose==1.3.7
-** numpy==1.18.5
-** scikit_learn==0.24.2
-** json-encoder==0.4.4
-** kiwisolver==1.4.5
+   * pandas==1.1.2
+   * six==1.15.0
+   * scipy==1.6.2
+   * tqdm==4.60.0
+   * nose==1.3.7
+   * numpy==1.18.5
+   * scikit_learn==0.24.2
+   * json-encoder==0.4.4
+   * kiwisolver==1.4.5
