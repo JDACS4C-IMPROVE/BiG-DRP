@@ -40,11 +40,11 @@ required=None
 additional_definitions=None
 
 # This should be set outside as a user environment variable
-#os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/'
+os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/BiG-DRP'
 
 #parent path
 fdir = Path('__file__').resolve().parent
-#source = "csa_data/raw_data/splits/"
+source = "csa_data/raw_data/splits/"
 auc_threshold=0.5
 
 # initialize class
@@ -85,17 +85,19 @@ def preprocess(params, data_dir):
     drug_response_dir = data_dir + "/drp-data/grl-preprocessed/drug_response/"
     sanger_tcga_dir = data_dir + "/drp-data/grl-preprocessed/sanger_tcga/"
     cross_study = data_dir + "/cross_study"
+    supplementary_dir =  data_dir + '/BiG_DRP_data/supplementary/'
     mkdir(drug_feature_dir)
     mkdir(drug_response_dir)
     mkdir(sanger_tcga_dir)
     mkdir(preprocessed_dir)
     mkdir(cross_study)
+    mkdir(supplementary_dir)
     args = candle.ArgumentStruct(**params)
     drug_synonym_file = data_dir + "/" + params['drug_synonyms']
     gene_expression_file = sanger_tcga_dir + "/" + params['expression_out']
     ln50_file = data_dir + "/" + params['data_file']
     model_label_file = data_dir + "/" + params['binary_file']
-    tcga_file =  data_dir  + 'supplementary/' + params['tcga_file']
+    tcga_file =  supplementary_dir + params['tcga_file']
     data_bin_cleaned_out = drug_feature_dir + params['data_bin_cleaned_out']
     data_cleaned_out = drug_response_dir + params['data_cleaned_out']
     data_tuples_out = drug_response_dir + params['data_tuples_out']
@@ -129,6 +131,7 @@ def preprocess(params, data_dir):
 
 def download_anl_data(params):
     csa_data_folder = os.path.join(os.environ['CANDLE_DATA_DIR'], 'csa_data', 'raw_data')
+    print(csa_data_folder)
     splits_dir = os.path.join(csa_data_folder, 'splits') 
     x_data_dir = os.path.join(csa_data_folder, 'x_data')
     y_data_dir = os.path.join(csa_data_folder, 'y_data')
@@ -229,16 +232,16 @@ def create_data_inputs(params, data_dir):
                                                       y_col_name=metric)
 
     rs_train = improve_utils.load_single_drug_response_data(source=data_type, split=0,
-                                                      split_type=["train"],
-                                                      y_col_name=metric)
-
+                                                            split_type=["train"],
+                                                            y_col_name=metric)
+    
     rs_val = improve_utils.load_single_drug_response_data(source=data_type, split=0,
-                                                      split_type=["val"],
-                                                      y_col_name=metric)
-
+                                                          split_type=["val"],
+                                                          y_col_name=metric)
+    
     rs_test = improve_utils.load_single_drug_response_data(source=data_type, split=0,
-                                                      split_type=["test"],
-                                                      y_col_name=metric)
+                                                           split_type=["test"],
+                                                           y_col_name=metric)
     create_big_drp_data(rs_train, data_dir, "train", params)
     create_big_drp_data(rs_val, data_dir, "val", params)
     create_big_drp_data(rs_test, data_dir, "test", params)    
@@ -378,6 +381,7 @@ def preprocess_data(params, data_dir):
         data_cleaned_out = data_dir + params[data_cleaned_data]
         data_bin_cleaned_data = "data_bin_cleaned_" + dt + "_out"
         data_bin_cleaned_out = data_dir + params[data_bin_cleaned_data]
+        print(data_bin_cleaned_out)
         data_tuples_data = "data_tuples_" + dt + "_out"
         data_tuples_out = data_dir + params[data_tuples_data]
         lnic50 = pd.read_csv(ic50_file, index_col=1, header=None)                                                 
@@ -406,6 +410,7 @@ def preprocess_data(params, data_dir):
         bin_data = bin_data.replace(reps)
         bin_data = bin_data.sort_index()[cells]
         OUTFILE = data_bin_cleaned_out
+        print(OUTFILE)
         bin_data.to_csv(OUTFILE)
         print("Generated cleaned bin file {0}".format(OUTFILE))
         print("Binarized matrix size:", bin_data.shape)
@@ -442,7 +447,7 @@ def preprocess_cross_study_data(params):
     drug_synonyms = params['drug_synonyms']
     fpkm_file = params['fpkm_file']
 #    data_cleaned_out = params['data_cleaned_out']
-#    data_bin_cleaned_out = params['data_bin_cleaned_out']
+    data_bin_cleaned_out = params['data_bin_cleaned_out']
 #    data_tuples_out = params['data_tuples_out']
     syn = pd.read_csv(drug_synonyms, header=None)
     cells = pd.read_csv(fpkm_file, index_col=0).columns
@@ -646,7 +651,7 @@ def generate_splits_anl(params, data_dir):
     tuples_label_fold_out = params['tuples_label_fold_out']
     for dt in split_type:
         count +=  1
-        data_bin_cleaned_out = data_dir + "/BiG_DRP_data_cleaned." + dt + ".csv"
+        data_bin_cleaned_out = data_dir + "/BiG_DRP_data_bined." + dt + ".csv"
         tuples_labels_out = data_dir + "/BiG_DRP_data_tuples." + dt + ".csv"
         labels = pd.read_csv(data_bin_cleaned_out, index_col=0)
 #        print(labels)
@@ -740,16 +745,16 @@ def candle_main(anl):
     data_dir = os.environ['CANDLE_DATA_DIR'] + "/Data/"
     params =  preprocess(params, data_dir)
     if params['improve_analysis'] == 'yes' or anl:
-        download_anl_data(params)
-        create_data_inputs(params, data_dir)
-        cross_study_test_data(params)
-        creating_drug_and_smiles_input(params['smiles_file'], params['drug_synonyms'])
-        download_author_data(params, data_dir) 
-        process_expression(params['tcga_file'], params['fpkm_file'])
-        preprocess_data(params, data_dir)
-        preprocess_cross_study_data(params)
-        generate_drug_descriptors(params['smiles_file'], params['descriptor_out'])
-        generate_morganprint(params['smiles_file'], params['morgan_data_out'])
+#        download_anl_data(params)
+#        create_data_inputs(params, data_dir)
+#        cross_study_test_data(params)
+#        creating_drug_and_smiles_input(params['smiles_file'], params['drug_synonyms'])
+#        download_author_data(params, data_dir) 
+#        process_expression(params['tcga_file'], params['fpkm_file'])
+#        preprocess_data(params, data_dir)
+#        preprocess_cross_study_data(params)
+#        generate_drug_descriptors(params['smiles_file'], params['descriptor_out'])
+#        generate_morganprint(params['smiles_file'], params['morgan_data_out'])
         generate_splits_anl(params, data_dir)
         write_out_constants(params)
     else:
