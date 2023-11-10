@@ -18,10 +18,14 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 file_path = os.path.dirname(os.path.realpath(__file__))
 
-
 # This should be set outside as a user environment variable
 #os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/'
+if not os.environ['CANDLE_DATA_DIR']:
+    print("CANDEL DATA DIR is missing")
+    exit()
 
+CANDLE_DATA_DIR=os.environ['CANDLE_DATA_DIR']
+# additional definitions
 
 # additional definitions
 additional_definitions = [
