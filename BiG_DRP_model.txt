@@ -18,7 +18,7 @@ seed = 0
 outroot = "."
 response = 'auc'
 normalize_response = "True"
-improve_analysis = 'no'
+improve_analysis = 'yes'
 
 [files]
 original_data='BiG_DRP_data.tar.gz'

@@ -365,6 +365,7 @@ def candle_main(ANL=True):
         for dt in data_type_list:
             print(dt)
             test_data_tup = cross_study_dir + "/" + dt + "_tuples_test.csv"
+            print(test_data_tup)
             test_data_cleaned = cross_study_dir + "/" + dt + "_cleaned_test.csv"
             assert(os.path.isfile(test_data_tup))
             cross_study_scores = run_cross_study(params, dt, gene_expression, test_data_cleaned, test_data_tup)
