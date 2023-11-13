@@ -7,5 +7,4 @@ numpy==1.21.5
 scikit_learn==1.1.2
 json-encoder==0.4.4
 kiwisolver==1.4.5
-dgl==0.8.1
 torch==1.11.0
