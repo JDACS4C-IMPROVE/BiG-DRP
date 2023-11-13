@@ -147,7 +147,7 @@ def fold_validation(hyperparams, seed, network, train_data, val_data,
 
     n_genes = cell_lines.shape[1]
     n_drug_feats = drug_feats.shape[1]
-
+    print(n_drug_feats)
     trainer = Trainer(n_genes, cell_lines, drug_feats, network, hyperparams)
     print("number of epochs is {0}".format(epoch))
     val_error, metric_names = trainer.fit(
