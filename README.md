@@ -43,7 +43,6 @@ cd BiG-DRP
 **Install Torch for CUDA. dgl and CANDLE package**
 
 ```
-python3 -m pip install torch==1.11.0+cu102 torchvision==0.12.0+cu102 torchaudio==0.11.0 torchmetrics==0.11.1 --extra-index-url https://download.pytorch.org/whl/cu102
 python3 -m pip install --pre dgl -f https://data.dgl.ai/wheels/cu113/repo.html
 python3 -m pip install --pre dglgo -f https://data.dgl.ai/wheels-test/repo.html
 python3 -m pip install git+https://github.com/ECP-CANDLE/candle_lib@develop
