@@ -33,9 +33,9 @@ class Trainer:
             graph_sampler = MultiLayerFullNeighborSampler(2)
             print(self.cell_feats.shape)
             drug_indices = torch.arange(len(drug_feats), dtype=torch.int64, device='cpu')
-            self.network.ndata['features'] = {'drug': self.drug_feats, 'cell_line': self.cell_feats}
-            _,_, blocks = graph_sampler.sample_blocks(self.network, {'drug': drug_indices})
-#            _,_, blocks = graph_sampler.sample_blocks(self.network, {'drug': range(len(drug_feats))})
+#            self.network.ndata['features'] = {'drug': self.drug_feats, 'cell_line': self.cell_feats}
+#            _,_, blocks = graph_sampler.sample_blocks(self.network, {'drug': drug_indices})
+            _,_, blocks = graph_sampler.sample_blocks(self.network, {'drug': range(len(drug_feats))})
             self.blocks = [b.to(self.device) for b in blocks]
 
             
