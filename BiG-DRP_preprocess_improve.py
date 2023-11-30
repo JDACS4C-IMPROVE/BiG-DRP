@@ -2,6 +2,9 @@ import candle
 import os
 import json
 import shutil
+from typing import Dict
+from typing import List
+from pathlib import Path
 from json import JSONEncoder
 from utils.utils import mkdir
 #from Big_DRP_train import main
@@ -32,10 +35,13 @@ import argparse
 import time
 from scipy.stats import pearsonr, spearmanr
 from collections import deque
+from improve import framework as frm
+# from improve import dataloader as dtl  # This is replaced with drug_resp_pred
+from improve import drug_resp_pred as drp  # some funcs from dataloader.py were copied to drp
 from sklearn.metrics import r2_score
-import improve_utils
-file_path = os.path.dirname(os.path.realpath(__file__))
-
+#import improve_utils
+#file_path = os.path.dirname(os.path.realpath(__file__))
+filepath = Path(__file__).resolve().parent
 required=None
 additional_definitions=None
 
@@ -46,6 +52,60 @@ os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/BiG-DRP'
 fdir = Path('__file__').resolve().parent
 source = "csa_data/raw_data/splits/"
 auc_threshold=0.5
+
+
+drp_preproc_params = [
+    {"name": "x_data_canc_files",  # app;                                                                                            
+     # "nargs": "+",                                                                                                                 
+     "type": str,
+     "help": "List of feature files.",
+    },
+    {"name": "x_data_drug_files",  # app;                                                                                            
+     # "nargs": "+",                                                                                                                 
+     "type": str,
+     "help": "List of feature files.",
+    },
+    {"name": "y_data_files",  # imp;                                                                                                 
+     # "nargs": "+",                                                                                                                 
+     "type": str,
+     "help": "List of output files.",
+    },
+    # {"name": "data_set",                                                                                                           
+    #  "type": str,                                                                                                                  
+    #  "help": "Data set to preprocess.",                                                                                           
+    # },                                                                                 
+    {"name": "split_id",                                                                                                           
+      "type": int,                                                                                                                  
+      "default": 0,                                                                                                                 
+      "help": "ID of split to read. This is used to find training/validation/testingpartitions and read lists of data samples to use for preprocessing.",
+     },                                                                                                                             
+    # {"name": "response_file",                                                                                                      
+    #  "type": str,                                                                                                                  
+    #  "default": "response.tsv",                                                                                                    
+    #  "help": "File with response data",             
+    # },                                                           
+    {"name": "canc_col_name",  # app;                                                  
+     "default": "improve_sample_id",
+     "type": str,
+     "help": "Column name that contains the cancer sample ids.",
+    },
+    {"name": "drug_col_name",  # app;                                                                          
+     "default": "improve_chem_id",
+     "type": str,
+     "help": "Column name that contains the drug ids.",
+    },
+    # {"name": "gene_system_identifier",  # app;                                                                                     
+    #  "nargs": "+",                                                                                                                
+    #  "type": str,                                                                                                                  
+    #  "help": "Gene identifier system to use. Options: 'Entrez', 'Gene_Symbol',\                                                    
+    #          'Ensembl', 'all', or any list combination.",                                                                          
+    # },
+]
+# gdrp_data_conf = []  # replaced with model_conf_params + drp_conf_params                                                          
+# preprocess_params = model_conf_params + drp_conf_params                                                                           
+preprocess_params = drp_preproc_params
+req_preprocess_args = [ll["name"] for ll in preprocess_params]  # TODO: it seems that all args specifiied to be 'req'. Why?          
+req_preprocess_args.extend(["y_col_name", "model_outdir"])    
 
 # initialize class
 class BiG_drp_candle(candle.Benchmark):
@@ -62,22 +122,46 @@ class BiG_drp_candle(candle.Benchmark):
 
             
 def initialize_parameters():
-    preprocessor_bmk = BiG_drp_candle(file_path,
-        'BiG_DRP_model.txt',
-        'pytorch',
-        prog='BiG_drp_candle',
-        desc='Data Preprocessor'
+    params = frm.initialize_parameters(
+        filepath,
+        default_model="BiG_DRP_model.txt",
+        additional_definitions=preprocess_params,
+        required=req_preprocess_args,
     )
-    #Initialize parameters
-    candle_data_dir = os.getenv("CANDLE_DATA_DIR")
-    gParameters = candle.finalize_parameters(preprocessor_bmk)
-    return gParameters
+    return params
 
 def mv_file(download_file, req_file):
     if os.path.isfile(req_file):
         pass
     else:
         shutil.move(download_file, req_file)
+
+
+def raw_data_available(params: Dict) -> frm.DataPathDict:
+    """                                                                                                                             
+    Sweep the expected raw data folder and check that files needed for cross-study analysis (CSA) are available.                         :params: Dict params: Dictionary of parameters read                                                                                  :return: Path to directories requested stored in dictionary with str key str and Path value.                                   
+    :rtype: DataPathDict                                                                                                             
+    """
+    # Expected                                                                                                                     
+    # raw_data -> {splits, x_data, y_data}                                                                                     
+    # Make sure that main path exists                                                                                            
+    mainpath = Path(os.environ["IMPROVE_DATA_DIR"])
+    if mainpath.exists() == False:
+        raise Exception(f"ERROR ! {mainpath} not found.\n")
+
+    inpath = mainpath / params["raw_data_dir"]
+    if inpath.exists() == False:
+        raise Exception(f"ERROR ! {inpath} not found.\n")
+
+    x_data_dir = inpath / params["x_data_dir"]
+    y_data_dir = inpath / params["y_data_dir"]
+    splits_dir = inpath / "splits"
+ #   xpath = frm.check_path_and_files(x_data_dir, params["x_data_files"], inpath)
+    ypath = frm.check_path_and_files(y_data_dir, params["y_data_files"][0], inpath)
+    spath = frm.check_path_and_files('raw_data/splits', [], inpath)
+    return {"y_data_path": ypath, "splits_path": spath}
+#    return {"x_data_path": xpath, "y_data_path": ypath, "splits_path": spath}
+
 
 def preprocess(params, data_dir):
     preprocessed_dir = data_dir + "/preprocessed"
@@ -93,6 +177,8 @@ def preprocess(params, data_dir):
     mkdir(cross_study)
     mkdir(supplementary_dir)
     args = candle.ArgumentStruct(**params)
+    params = frm.build_paths(params)  
+    processed_outdir = frm.create_ml_data_outdir(params)
     drug_synonym_file = data_dir + "/" + params['drug_synonyms']
     gene_expression_file = sanger_tcga_dir + "/" + params['expression_out']
     ln50_file = data_dir + "/" + params['data_file']
@@ -117,9 +203,12 @@ def preprocess(params, data_dir):
     params['tuples_label_out'] = drug_response_dir + "/" + params['data_tuples_out']
     params['tuples_label_fold_out'] = drug_response_dir + "/" + params['labels']
     params['tcga_file'] = tcga_file
+    params['raw_data_dir'] = '.'
+    params['x_data_dir'] = 'raw_data/x_data'
+    params['y_data_dir'] = 'raw_data/y_data'
     params['dataroot'] = data_dir
-    params['folder'] = params['outroot']
-    params['outroot'] = params['outroot']
+    params['folder'] = params['model_outdir']
+    params['outroot'] = params['model_outdir']
     params['network_perc'] = params['network_percentile']
     params['drug_feat'] = params['drug_feat']
     params['drug_synonyms'] = drug_synonym_file
@@ -129,15 +218,35 @@ def preprocess(params, data_dir):
     params['tuples_label_fold_out'] = tuples_label_fold_out
     return(params)
 
-def download_anl_data(params):
+
+def check_data_available(params: Dict) -> frm.DataPathDict:
+    """                                                                                                                              
+    Sweep the expected input paths and check that raw data files needed for preprocessing are available.                                                                                                            
+    :params: Dict params: Dictionary of parameters read                                                                          
+    :return: Path to directories requested stored in dictionary with str key str and Path value.                                 
+    :rtype: DataPathDict                                                                                                             
+    """
+    # Check that raw data is available                                                                                               
+    # Expected                                                                                                                       
+    # raw_data -> {splits, x_data, y_data}                                                                                           
+    ipathd = raw_data_available(params)
+    # Create output directory. Do not complain if it exists.                                                                         
+    opath = Path(params["model_outdir"]) # this was originally called ml_data                                                        
+    os.makedirs(opath, exist_ok=True)
+    # Return in DataPathDict structure
+    inputdtd = {"y_data_path": ipathd["y_data_path"],"splits_path": ipathd["splits_path"]}
+    outputdtd = {"preprocess_path": opath}
+    return inputdtd, outputdtd
+    
+def download_anl_data(params: Dict, inputdtd: frm.DataPathDict):
     csa_data_folder = os.path.join(os.environ['CANDLE_DATA_DIR'], 'csa_data', 'raw_data')
     print(csa_data_folder)
-    splits_dir = os.path.join(csa_data_folder, 'splits') 
-    x_data_dir = os.path.join(csa_data_folder, 'x_data')
-    y_data_dir = os.path.join(csa_data_folder, 'y_data')
-    improve_data_url = params['improve_data_url']
-    data_type = params['data_type']
-    data_type_list = data_type.split(",")
+#    splits_dir = os.path.join(csa_data_folder, 'splits') 
+#    x_data_dir = os.path.join(csa_data_folder, 'x_data')
+#    y_data_dir = os.path.join(csa_data_folder, 'y_data')
+#    improve_data_url = params['improve_data_url']
+#    data_type = params['data_type']
+#    data_type_list = data_type.split(",")
     print("data downloaded dir is {0}".format(csa_data_folder))
     if not os.path.exists(csa_data_folder):
         print('creating folder: %s'%csa_data_folder)
@@ -145,32 +254,38 @@ def download_anl_data(params):
         mkdir(splits_dir)
         mkdir(x_data_dir)
         mkdir(y_data_dir)
-    
+#    fname = [inputdtd["x_data_path"] / fname for fname in params["x_data_files"]]
+#    for f in fname:
+#        if f.exists() == False:
+#            raise Exception(f"ERROR ! File '{fname}' file not found.\n")
+#    print(fname)
+#    df_drug = drp.load_drug_data(fname)
+#    print("\nLoading omics data...")
+    oo = drp.OmicsLoader(params)
+    ge = oo.dfs['cancer_gene_expression.tsv']
+    dd = drp.DrugsLoader(params)
+    smi = dd.dfs['drug_SMILES.tsv']
+    #params['drug_synonyms']
+    smd = dd.dfs['drug_ecfp4_nbits512.tsv']
+    stages = {"train": params["train_split_file"],
+              "val": params["val_split_file"],
+              "test": params["test_split_file"]}
+    scaler = None
+    for stage, split_file in stages.items():
+        rr = drp.DrugResponseLoader(params, split_file=split_file, verbose=True)
+        df_response = rr.dfs["response.tsv"]
+        ydf, df_canc = drp.get_common_samples(df1=df_response, df2=ge,
+                                              ref_col=params["canc_col_name"])
+        create_big_drp_data(ydf, stage, params)
+        #print(ydf[[params["canc_col_name"], params["drug_col_name"]]].nunique())
 
-    for files in ['_all.txt', '_split_0_test.txt',
-                  '_split_0_train.txt', '_split_0_val.txt']:
-        url_dir = improve_data_url + "/splits/"
-        for dt in data_type_list:
-            improve_file = dt + files
-            data_file = url_dir + improve_file
-            print("downloading file: %s"%data_file)
-            candle.file_utils.get_file(improve_file, url_dir + improve_file,
-                                       datadir=splits_dir,
-                                       cache_subdir=None)
 
-    for improve_file in ['cancer_gene_expression.tsv', 'drug_SMILES.tsv','drug_ecfp4_nbits512.tsv' ]:
-        url_dir = improve_data_url + "/x_data/"
-        data_file = url_dir + improve_file
-        print("downloading file: %s"%data_file)        
-        candle.file_utils.get_file(fname=improve_file, origin=url_dir + improve_file,
-                                   datadir=x_data_dir,
-                                   cache_subdir=None)
 
-    url_dir = improve_data_url + "/y_data/"
-    response_file  = 'response.tsv'
-    candle.file_utils.get_file(fname=response_file, origin=url_dir + response_file,
-                                   datadir=y_data_dir,
-                                   cache_subdir=None)
+#    url_dir = improve_data_url + "/y_data/"
+#    response_file  = 'response.tsv'
+#    candle.file_utils.get_file(fname=response_file, origin=url_dir + response_file,
+#                                   datadir=y_data_dir,
+#                                   cache_subdir=None)
 
     
 def download_author_data(params, data_dir):
@@ -196,9 +311,12 @@ def convert_to_binary(x):
         return ""
 
 
-def create_big_drp_data(df, data_dir, split_type, params):
+def create_big_drp_data(df, split_type, params):
     metric = params['metric']
-    rs_df = df.pivot_table(index='improve_chem_id', columns='improve_sample_id', values=metric, aggfunc='mean')
+    rs_df = df[['improve_sample_id','improve_chem_id',metric]]
+    rs_df = df.pivot_table(index='improve_chem_id', columns='improve_sample_id', values=metric)
+#    rs_df = df.pivot_table(index='improve_chem_id', columns='improve_sample_id', values=metric, aggfunc='mean')
+
     rs_df = rs_df.reset_index()
     rs_tdf = rs_df.set_index("improve_chem_id")
     rs_tdf = rs_tdf.T
@@ -211,40 +329,42 @@ def create_big_drp_data(df, data_dir, split_type, params):
     rs_binary_df = rs_binary_df.reset_index()
     rs_binary_df = rs_binary_df.apply(np.roll, shift=1)
     binary_file = 'binary_' + split_type + "_file"
-    binary_input=data_dir + params[binary_file]
+    binary_input= params['train_ml_data_dir'] + params[binary_file]
+    print("writing out file {0}".format(binary_input))
     rs_binary_df.to_csv(binary_input, index=None)
     rs_tdf = rs_tdf.reset_index()
     rs_tdf = rs_tdf.rename({'compounds': "sample_names"},axis=1)
     ic50_file = 'data_' + split_type + "_file"    
-    data_input = data_dir + params[ic50_file]
+    data_input = params['train_ml_data_dir'] + params[ic50_file]
+    print("writing out file {0}".format(data_input))
     rs_tdf.to_csv(data_input, index_label="improve_id")
 
     
-def create_data_inputs(params, data_dir):
-    data_input = params['data_input']
-    binary_input = params['binary_input']
-    train_data_type = params['train_data_type']
-    metric = params['metric']
-    auc_threshold = params['auc_threshold']
-    data_type =  params['train_data_type']
-    rs = improve_utils.load_single_drug_response_data(source=data_type, split=0,
-                                                      split_type=["train", "val", "test"],
-                                                      y_col_name=metric)
+#def create_data_inputs(params, data_dir):
+#    data_input = params['data_input']
+#    binary_input = params['binary_input']
+#    train_data_type = params['train_data_type']
+#    metric = params['metric']
+#    auc_threshold = params['auc_threshold']
+#    data_type =  params['train_data_type']
+#    rs = improve_utils.load_single_drug_response_data(source=data_type, split=0,
+#                                                      split_type=["train", "val", "test"],
+#                                                      y_col_name=metric)
 
-    rs_train = improve_utils.load_single_drug_response_data(source=data_type, split=0,
-                                                            split_type=["train"],
-                                                            y_col_name=metric)
+#    rs_train = improve_utils.load_single_drug_response_data(source=data_type, split=0,
+#                                                            split_type=["train"],
+#                                                            y_col_name=metric)
     
-    rs_val = improve_utils.load_single_drug_response_data(source=data_type, split=0,
-                                                          split_type=["val"],
-                                                          y_col_name=metric)
+#    rs_val = improve_utils.load_single_drug_response_data(source=data_type, split=0,
+#                                                          split_type=["val"],
+#                                                          y_col_name=metric)
     
-    rs_test = improve_utils.load_single_drug_response_data(source=data_type, split=0,
-                                                           split_type=["test"],
-                                                           y_col_name=metric)
-    create_big_drp_data(rs_train, data_dir, "train", params)
-    create_big_drp_data(rs_val, data_dir, "val", params)
-    create_big_drp_data(rs_test, data_dir, "test", params)    
+#    rs_test = improve_utils.load_single_drug_response_data(source=data_type, split=0,
+#                                                           split_type=["test"],
+#                                                           y_col_name=metric)
+#    create_big_drp_data(rs_train, data_dir, "train", params)
+#    create_big_drp_data(rs_val, data_dir, "val", params)
+#    create_big_drp_data(rs_test, data_dir, "test", params)    
     
 
     
@@ -301,9 +421,9 @@ def process_expression(tcga_file, expression_out):
     fpkm_df.to_csv(expression_out, index=None)
     
 
-def creating_drug_and_smiles_input(smiles_out, drug_synonyms_out):
-    se = improve_utils.load_smiles_data()
-    se = se.set_index("improve_chem_id")
+def creating_drug_and_smiles_input(df, params):
+    #se = improve_utils.load_smiles_data()
+    se = df.set_index("improve_chem_id")
     se.to_csv(smiles_out, index_label=None)
     #creating the synonmys file
     improve_chem_list = se.index.tolist()
@@ -744,8 +864,10 @@ def candle_main(anl):
     params = initialize_parameters()
     data_dir = os.environ['CANDLE_DATA_DIR'] + "/Data/"
     params =  preprocess(params, data_dir)
+#    print(params)
     if params['improve_analysis'] == 'yes' or anl:
-#        download_anl_data(params)
+        inputd, outputd = check_data_available(params)
+        download_anl_data(params, inputd)
 #        create_data_inputs(params, data_dir)
 #        cross_study_test_data(params)
 #        creating_drug_and_smiles_input(params['smiles_file'], params['drug_synonyms'])
@@ -755,11 +877,11 @@ def candle_main(anl):
 #        preprocess_cross_study_data(params)
 #        generate_drug_descriptors(params['smiles_file'], params['descriptor_out'])
 #        generate_morganprint(params['smiles_file'], params['morgan_data_out'])
-        generate_splits_anl(params, data_dir)
-        write_out_constants(params)
-    else:
-        download_author_data(params, data_dir)
-        write_out_constants(params)
+#        generate_splits_anl(params, data_dir)
+#        write_out_constants(params)
+#    else:
+#        download_author_data(params, data_dir)
+#        write_out_constants(params)
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
