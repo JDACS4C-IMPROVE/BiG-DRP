@@ -15,7 +15,8 @@ def initialize(FLAGS, LABEL_FILE, GENE_EXPRESSION_FILE, LABEL_MATRIX_FILE, DRUG_
                binary=False, multitask=False):
 
     reset_seed(FLAGS.seed)
-    mkdir(FLAGS.outroot + "/results/" + FLAGS.folder)
+    mkdir(FLAGS.model_outdir + "/results/")
+    #mkdir(FLAGS.outroot + "/results/" + FLAGS.folder)
 
 #    LABEL_FILE = FLAGS.dataroot  +  
 #    print(LABEL_FILE)

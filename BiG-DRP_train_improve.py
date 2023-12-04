@@ -1,13 +1,20 @@
+from pathlib import Path
 from utils.tuple_dataset import TupleMatrixDataset
 from utils.utils import mkdir, reindex_tuples, moving_average, reset_seed, create_fold_mask
 from utils.network_gen import create_network
 from utils.data_initializer import initialize
 from argparse import Namespace
 import torch
+from pathlib import Path
+from pprint import pformat
+from typing import Dict, Union
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import r2_score
 from torch.utils.data import DataLoader, TensorDataset
 from bigdrp.trainer import Trainer
+from improve import framework as frm
+from improve.metrics import compute_metrics
+from candle import CandleCkptPyTorch
 import numpy as np
 import pandas as pd
 import os
@@ -18,29 +25,42 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 file_path = os.path.dirname(os.path.realpath(__file__))
 
-# This should be set outside as a user environment variable
-#os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/'
-if not os.environ['CANDLE_DATA_DIR']:
-    print("CANDEL DATA DIR is missing")
-    exit()
+filepath = Path(__file__).resolve().parent
 
-CANDLE_DATA_DIR=os.environ['CANDLE_DATA_DIR']
-# additional definitions
+# [Req] List of metrics names to be compute performance scores
+metrics_list = ["mse", "rmse", "pcc", "scc", "r2"]  
 
-# additional definitions
-additional_definitions = [
+# [Req] App-specific params (App: monotherapy drug response prediction)
+# Currently, there are no app-specific args for the train script.
+app_train_params = []
+
+# [GraphDRP] Model-specific params (Model: GraphDRP)
+model_train_params = [
+    {
+        "name": "log_interval",
+        "action": "store",
+        "type": int,
+        "help": "Interval for saving o/p"
+    },
+    {
+        "name": "cuda_name",  # TODO. frm. How should we control this?
+        "action": "store",
+        "type": str,
+        "help": "Cuda device (e.g.: cuda:0, cuda:1."
+    },
+    {
+        "name": "learning_rate",
+        "type": float,
+        "default": 0.0001,
+        "help": "Learning rate for the optimizer."
+    },
     {
         "name": "batch_size",
         "type": int,
         "help": "...",
     },
     {
-        "name": "learning_rate",
-        "type": int,
-        "help": "learning rate for the model",
-    },
-    {   
-        "name": "epoch",
+        "name": "epochs",
         "type": int,
         "help": "number of epochs to train on",
     },
@@ -49,94 +69,40 @@ additional_definitions = [
         "type": int,
         "help": "network percentile for metrics",
     },
-    {   
-        "name": "cuda",
-        "type": int, 
-        "help": "CUDA ID",
-    },
 ]
 
-# required definitions
-required = None
+req_preprocess_args = [ll["name"] for ll in model_train_params]
 
-# initialize class
-class BiG_drp_candle(candle.Benchmark):
-    def set_locals(self):
-        """
-        Functionality to set variables specific for the benchmark
-        - required: set of required parameters for the benchmark.
-        - additional_definitions: list of dictionaries describing the additional parameters for the benchmark.
-        """
-        if required is not None: 
-            self.required = set(required)
-        if additional_definitions is not None:
-            self.additional_definisions = additional_definitions
+def config_checkpointing(params: Dict, model, optimizer):
+    """Configure CANDLE checkpointing. Reads last saved state if checkpoints exist.
+
+    :params str ckpt_directory: String with path to directory for storing the CANDLE checkpointing for the model being trained.
+
+    :return: Number of training iterations already run (this may be > 0 if reading from checkpointing).
+    :rtype: int
+    """
+    # params["ckpt_directory"] = ckpt_directory
+    initial_epoch = 0
+    # TODO. This creates directory self.params["ckpt_directory"]
+    # import pdb; pdb.set_trace()
+    ckpt = CandleCkptPyTorch(params)
+    ckpt.set_model({"model": model, "optimizer": optimizer})
+    J = ckpt.restart(model)
+    if J is not None:
+        initial_epoch = J["epoch"]
+        print("restarting from ckpt: initial_epoch: %i" % initial_epoch)
+    return ckpt, initial_epoch
 
             
 def initialize_parameters():
-    preprocessor_bmk = BiG_drp_candle(file_path,
-        'BiG_DRP_model.txt',
-        'pytorch',
-        prog='BiG_drp_candle',
-        desc='Data Preprocessor'
+    params = frm.initialize_parameters(
+        filepath,
+        default_model="BiG_DRP_model.txt",
+        additional_definitions=model_train_params,
+        required=req_preprocess_args,
     )
-    #Initialize parameters
-    candle_data_dir = os.getenv("CANDLE_DATA_DIR")
-    gParameters = candle.finalize_parameters(preprocessor_bmk)
-    return gParameters
+    return params
 
-
-def preprocess(params):
-    keys_parsing = ["DATAROOT", "FOLDER", "WEIGHT_FOLDER",
-                    "OUTROOT", "MODE", "SEED",
-                    "DRUG_FEATURE", "NETWORK_PERCENTILE"]
-    data_dir = os.environ['CANDLE_DATA_DIR'] + "/Data/"
-    preprocessed_dir = data_dir + "/preprocessed"
-    drug_feature_dir = data_dir + "/BiG_DRP_data/drp-data/grl-preprocessed/drug_features/" 
-    drug_response_dir = data_dir + "/BiG_DRP_data/drp-data/grl-preprocessed/drug_response/"
-    sanger_tcga_dir = data_dir + "/BiG_DRP_data/drp-data/grl-preprocessed/sanger_tcga/"
-    cross_study =  data_dir + "/cross_study"
-    model_param_key = []
-    for key in params.keys():
-        if key not in keys_parsing:
-                model_param_key.append(key)
-    model_params = {key: params[key] for key in model_param_key}
-    params['model_params'] = model_params
-    args = candle.ArgumentStruct(**params)
-    drug_synonym_file = data_dir + "/" + params['drug_synonyms']
-    gene_expression_file = sanger_tcga_dir + "/" + params['expression_out']
-    ln50_file = data_dir + "/" + params['data_file']
-    model_label_file = data_dir + "/" + params['binary_file']
-    tcga_file =  data_dir +'/' + 'supplementary' + params['tcga_file']
-    data_bin_cleaned_out = drug_response_dir + "BiG_DRP_data_bined.csv"
-    data_cleaned_out = drug_response_dir + "BiG_DRP_data_cleaned.csv" #BiG_DRP_data_cleaned.csv
-    data_tuples_out = drug_response_dir + "BiG_DRP_data_tuples.csv"
-    tuples_label_fold_out = drug_response_dir + "BiG_DRP_tuple_labels_folds.csv" #BiG_DRP_tuple_labels_folds.csv
-    smiles_file = data_dir + params['smiles_file']
-    params['data_bin_cleaned_out'] = data_bin_cleaned_out
-    params['data_input'] = data_dir + "/" + params['data_file']
-    params['binary_input'] = data_dir + "/" + params['binary_file']
-    params['drug_out'] = data_dir + '/' + params['drugset']
-    params['fpkm_file'] = gene_expression_file
-    params['descriptors'] = drug_feature_dir + "/" + params['descriptor_out'] 
-    params['morgan_data_out'] = drug_feature_dir + "/" + params['morgan_out']
-    params['model_label_file'] = model_label_file
-    params['smiles_file'] =  smiles_file
-    params['model_label_file'] = model_label_file
-    params['tuples_label_out'] = drug_response_dir + "/" + params['data_tuples_out']
-    params['tuples_label_fold_out'] = drug_response_dir + "/" + params['tuples_label_fold_out']
-    params['tcga_file'] = tcga_file
-    params['dataroot'] = data_dir
-    params['folder'] = params['outroot']
-    params['outroot'] = params['outroot']
-    params['network_perc'] = params['network_percentile']
-    params['drug_feat'] = params['drug_feat']
-    params['drug_synonym'] = drug_synonym_file
-    params['data_bin_cleaned_out'] = data_bin_cleaned_out
-    params['data_cleaned_out'] = data_cleaned_out
-    params['data_tuples_out'] = data_tuples_out
-    params['tuples_label_fold_out'] = tuples_label_fold_out
-    return(params)
 
 def fold_validation(hyperparams, seed, network, train_data, val_data,
                     cell_lines, drug_feats, tuning, epoch, maxout=False):
@@ -302,12 +268,13 @@ def nested_cross_validation(FLAGS, drug_feats, cell_lines, labels,
 
         final_metrics[i] = test_error[-1]
         test_metrics = pd.DataFrame(test_error, columns=metric_names)
-        test_metrics.to_csv(FLAGS.outroot + "/results/" + 'fold_%d.csv'%i, index=False)
+#        test_metrics.to_csv(
+        test_metrics.to_csv(FLAGS.model_outdir + "/results/" + 'fold_%d.csv'%i, index=False)
 
         drug_enc = trainer.get_drug_encoding().cpu().detach().numpy()
-        pd.DataFrame(drug_enc, index=drug_list).to_csv(FLAGS.outroot + "/results/" + 'encoding_fold_%d.csv'%i)
+        pd.DataFrame(drug_enc, index=drug_list).to_csv(FLAGS.model_outdir + "/results/" + 'encoding_fold_%d.csv'%i)
 
-        trainer.save_anl_model(FLAGS.outroot + "/results/" + "model", i, hp)
+        trainer.save_anl_model(FLAGS.model_outdir + "/results/" + "model", i, hp)
 #        test_x.to_csv("testData.csv", index=False)
         # save predictions
         test_data = TensorDataset(torch.FloatTensor(test_x))
@@ -319,7 +286,7 @@ def nested_cross_validation(FLAGS, drug_feats, cell_lines, labels,
         test_mask = test_mask.replace(0, np.nan)
         prediction_matrix = prediction_matrix*test_mask
 
-        prediction_matrix.to_csv(FLAGS.outroot + "/results/" + '/val_prediction_fold_%d.csv'%i)
+        prediction_matrix.to_csv(FLAGS.model_outdir + "/results/" + '/val_prediction_fold_%d.csv'%i)
     
     return final_metrics
 
@@ -399,11 +366,12 @@ def anl_test_data(FLAGS, drug_feats, cell_lines, labels,
                                                         epoch=hp['num_epoch'], maxout=True) 
 
     test_metrics = pd.DataFrame(test_error, columns=metric_names)
-    test_metrics.to_csv(FLAGS.outroot + "/results/fold_%d.csv", index=False)
+    test_metrics.to_csv(params['model_outdir'] + "/fold_%d.csv", index=False)
+#    test_metrics.to_csv(FLAGS.model_outdir + "/results/fold_%d.csv", index=False)
 
     drug_enc = trainer.get_drug_encoding().cpu().detach().numpy()
-    pd.DataFrame(drug_enc, index=drug_list).to_csv(FLAGS.outroot + '/results/encoding_fold_%d.csv')
-    outdir= FLAGS.outroot + "/results/"
+    pd.DataFrame(drug_enc, index=drug_list).to_csv(FLAGS.model_outdir + '/results/encoding_fold_%d.csv')
+    outdir= FLAGS.model_outdir + "/results/"
     trainer.save_anl_model(outdir, hp)
     print("model built at {0}".format(outdir))
     test_data = TensorDataset(torch.FloatTensor(test_x))
@@ -423,7 +391,7 @@ def anl_test_data(FLAGS, drug_feats, cell_lines, labels,
     pcc, _ = pearsonr(label_flat,prediction_flat)
     r2 = 1 - (RSS/TSS)
     prediction_matrix = pd.DataFrame(prediction_matrix, index=test_samples, columns=drug_list)
-    prediction_matrix.to_csv(FLAGS.outroot + "/results/val_prediction_fold_%d.csv")
+    prediction_matrix.to_csv(FLAGS.model_outdir + "/results/val_prediction_fold_%d.csv")
     final_metrics = pd.DataFrame([test_error[-1]], columns=metric_names)
     final_metrics = final_metrics.T
 #    final_metrics = pd.DataFrame(test_error[-1])
@@ -435,22 +403,27 @@ def anl_test_data(FLAGS, drug_feats, cell_lines, labels,
     return final_metrics
 
 
-def main(params):
-    ns = Namespace(**params)
+def main(drp_params, params):
+    ns = Namespace(**drp_params)
     FLAGS = ns
+    tuples_label_fold_out = params['train_ml_data_dir'] + "/" +  params['tuples_label_fold_out']
+    expression_out = params['train_ml_data_dir'] + "/" +  params['expression_out']
+    data_cleaned_out = params['train_ml_data_dir'] + "/" +  params['data_cleaned_out']
+    descriptor_out = params['train_ml_data_dir'] + "/" +  params['descriptor_out']
+    morgan_out = params['train_ml_data_dir'] + "/" +  params['morgan_out']    
     drug_feats, cell_lines, labels, label_matrix, normalizer = initialize(FLAGS,
-                                                                          params['tuples_label_fold_out'],
-                                                                          params['fpkm_file'],
-                                                                          params['data_cleaned_out'],
-                                                                          params['descriptors'],
-                                                                          params['morgan_data_out'])
-    test_metrics = anl_test_data(FLAGS, drug_feats, cell_lines, labels,label_matrix, normalizer, 
-                                 params['learning_rate'], params['epochs'], params['batch_size'])
+                                                                          tuples_label_fold_out,
+                                                                          expression_out,
+                                                                          data_cleaned_out,
+                                                                          descriptor_out,
+                                                                          morgan_out)
+#    test_metrics = anl_test_data(FLAGS, drug_feats, cell_lines, labels,label_matrix, normalizer, 
+#                                 params['learning_rate'], params['epochs'], params['batch_size'])
 #    test_metrics = nested_cross_validation(FLAGS, drug_feats, cell_lines, labels,
 #                                           label_matrix, normalizer, learning_rate, epoch, batch_size)
 
 #    test_metrics = test_metrics.mean(axis=0)
-    print(test_metrics)
+#    print(test_metrics)
 #    print("Overall Performance")
 #    print("MSE: %f"%test_metrics[0])
 #    print("RMSE: %f"%np.sqrt(test_metrics[0]))
@@ -466,15 +439,18 @@ def main(params):
 
 def candle_main():
     params = initialize_parameters()
-    params =  preprocess(params)
+    frm.create_outdir(outdir=params["model_outdir"])
+    modelpath = frm.build_model_path(params, model_dir=params["model_outdir"])
+#    params =  preprocess(params)
 #    print(params)
-    drp_params = dict((k, params[k]) for k in ('descriptors', 'fpkm_file','morgan_data_out','data_cleaned_out',
-                                               'model_label_file', 'tuples_label_fold_out',
+    drp_params = dict((k, params[k]) for k in ('descriptor_out', 'expression_out','morgan_out','data_cleaned_out',
+                                               'labels', 'tuples_label_fold_out',
                                                'dataroot', 'drug_feat',
-                                               'folder', 'mode', 'network_perc',
-                                               'normalize_response', 'outroot', 'seed',
-                                               'split', 'weight_folder', 'epochs', 'batch_size', 'learning_rate'))
-    scores = main(drp_params)
+                                               'model_outdir', 'mode', 'network_percentile',
+                                               'normalize_response', 'seed',
+                                               'split', 'weight_folder', 'epochs',
+                                               'batch_size', 'learning_rate'))
+    scores = main(drp_params, params)
 
 
 if __name__ == "__main__":

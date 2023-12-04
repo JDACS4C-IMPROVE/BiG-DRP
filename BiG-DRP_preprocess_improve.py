@@ -165,13 +165,13 @@ def raw_data_available(params: Dict) -> frm.DataPathDict:
 
 def preprocess(params, data_dir):
     preprocessed_dir = data_dir + "/preprocessed"
-    drug_feature_dir = data_dir + "/drp-data/grl-preprocessed/drug_features/"
-    drug_response_dir = data_dir + "/drp-data/grl-preprocessed/drug_response/"
+#    drug_feature_dir = data_dir + "/drp-data/grl-preprocessed/drug_features/"
+#    drug_response_dir = data_dir + "/drp-data/grl-preprocessed/drug_response/"
     sanger_tcga_dir = data_dir + "/drp-data/grl-preprocessed/sanger_tcga/"
     cross_study = data_dir + "/cross_study"
     supplementary_dir =  data_dir + '/BiG_DRP_data/supplementary/'
-    mkdir(drug_feature_dir)
-    mkdir(drug_response_dir)
+ #   mkdir(drug_feature_dir)
+ #   mkdir(drug_response_dir)
     mkdir(sanger_tcga_dir)
     mkdir(preprocessed_dir)
     mkdir(cross_study)
@@ -179,29 +179,29 @@ def preprocess(params, data_dir):
     args = candle.ArgumentStruct(**params)
     params = frm.build_paths(params)  
     processed_outdir = frm.create_ml_data_outdir(params)
-    drug_synonym_file = data_dir + "/" + params['drug_synonyms']
-    gene_expression_file = sanger_tcga_dir + "/" + params['expression_out']
-    ln50_file = data_dir + "/" + params['data_file']
-    model_label_file = data_dir + "/" + params['binary_file']
+    drug_synonym_file = params['train_ml_data_dir'] + "/" + params['drug_synonyms']
+    gene_expression_file = params['train_ml_data_dir'] + "/" + params['expression_out']
+    ln50_file = params['train_ml_data_dir'] + "/" + params['data_file']
+    model_label_file = params['train_ml_data_dir'] + "/" + params['binary_file']
     tcga_file =  supplementary_dir + params['tcga_file']
-    data_bin_cleaned_out = drug_feature_dir + params['data_bin_cleaned_out']
-    data_cleaned_out = drug_response_dir + params['data_cleaned_out']
-    data_tuples_out = drug_response_dir + params['data_tuples_out']
-    tuples_label_fold_out = drug_response_dir + params['labels']
-    smiles_file = data_dir + params['smiles_file']
+    data_bin_cleaned_out = params['train_ml_data_dir'] + '/' +params['data_bin_cleaned_out']
+    data_cleaned_out = params['train_ml_data_dir'] + '/' + params['data_cleaned_out']
+    data_tuples_out = params['train_ml_data_dir'] + '/' + params['data_tuples_out']
+    tuples_label_fold_out = params['train_ml_data_dir'] + '/' + params['labels']
+    smiles_file = params['train_ml_data_dir'] + '/' +params['smiles_file']
     params['cross_study'] = cross_study
     params['data_bin_cleaned_out'] = data_bin_cleaned_out
-    params['data_input'] = data_dir + "/" + params['data_file']
-    params['binary_input'] = data_dir + "/" + params['binary_file']
-    params['drug_out'] = data_dir + '/' + params['drugset']
+    params['data_input'] = params['train_ml_data_dir'] + "/" + params['data_file']
+    params['binary_input'] = params['train_ml_data_dir'] + "/" + params['binary_file']
+    params['drug_out'] = params['train_ml_data_dir'] + '/' + params['drugset']
     params['fpkm_file'] = gene_expression_file
-    params['descriptor_out'] = drug_feature_dir + "/" + params['descriptor_out'] 
-    params['morgan_data_out'] = drug_feature_dir + "/" + params['morgan_out']
+    params['descriptor_out'] = params['train_ml_data_dir'] + "/" + params['descriptor_out'] 
+    params['morgan_data_out'] = params['train_ml_data_dir'] + "/" + params['morgan_out']
     params['model_label_file'] = model_label_file
     params['smiles_file'] =  smiles_file
     params['model_label_file'] = model_label_file
-    params['tuples_label_out'] = drug_response_dir + "/" + params['data_tuples_out']
-    params['tuples_label_fold_out'] = drug_response_dir + "/" + params['labels']
+    params['tuples_label_out'] = params['train_ml_data_dir'] + "/" + params['data_tuples_out']
+    params['tuples_label_fold_out'] = params['train_ml_data_dir'] + "/" + params['labels']
     params['tcga_file'] = tcga_file
     params['raw_data_dir'] = '.'
     params['x_data_dir'] = 'raw_data/x_data'
@@ -238,55 +238,6 @@ def check_data_available(params: Dict) -> frm.DataPathDict:
     outputdtd = {"preprocess_path": opath}
     return inputdtd, outputdtd
     
-def download_anl_data(params: Dict, inputdtd: frm.DataPathDict):
-    csa_data_folder = os.path.join(os.environ['CANDLE_DATA_DIR'], 'csa_data', 'raw_data')
-    print(csa_data_folder)
-#    splits_dir = os.path.join(csa_data_folder, 'splits') 
-#    x_data_dir = os.path.join(csa_data_folder, 'x_data')
-#    y_data_dir = os.path.join(csa_data_folder, 'y_data')
-#    improve_data_url = params['improve_data_url']
-#    data_type = params['data_type']
-#    data_type_list = data_type.split(",")
-    print("data downloaded dir is {0}".format(csa_data_folder))
-    if not os.path.exists(csa_data_folder):
-        print('creating folder: %s'%csa_data_folder)
-        os.makedirs(csa_data_folder)
-        mkdir(splits_dir)
-        mkdir(x_data_dir)
-        mkdir(y_data_dir)
-#    fname = [inputdtd["x_data_path"] / fname for fname in params["x_data_files"]]
-#    for f in fname:
-#        if f.exists() == False:
-#            raise Exception(f"ERROR ! File '{fname}' file not found.\n")
-#    print(fname)
-#    df_drug = drp.load_drug_data(fname)
-#    print("\nLoading omics data...")
-    oo = drp.OmicsLoader(params)
-    ge = oo.dfs['cancer_gene_expression.tsv']
-    dd = drp.DrugsLoader(params)
-    smi = dd.dfs['drug_SMILES.tsv']
-    #params['drug_synonyms']
-    smd = dd.dfs['drug_ecfp4_nbits512.tsv']
-    stages = {"train": params["train_split_file"],
-              "val": params["val_split_file"],
-              "test": params["test_split_file"]}
-    scaler = None
-    for stage, split_file in stages.items():
-        rr = drp.DrugResponseLoader(params, split_file=split_file, verbose=True)
-        df_response = rr.dfs["response.tsv"]
-        ydf, df_canc = drp.get_common_samples(df1=df_response, df2=ge,
-                                              ref_col=params["canc_col_name"])
-        create_big_drp_data(ydf, stage, params)
-        #print(ydf[[params["canc_col_name"], params["drug_col_name"]]].nunique())
-
-
-
-#    url_dir = improve_data_url + "/y_data/"
-#    response_file  = 'response.tsv'
-#    candle.file_utils.get_file(fname=response_file, origin=url_dir + response_file,
-#                                   datadir=y_data_dir,
-#                                   cache_subdir=None)
-
     
 def download_author_data(params, data_dir):
     print("downloading file: %s"%params['data_url'])
@@ -329,13 +280,13 @@ def create_big_drp_data(df, split_type, params):
     rs_binary_df = rs_binary_df.reset_index()
     rs_binary_df = rs_binary_df.apply(np.roll, shift=1)
     binary_file = 'binary_' + split_type + "_file"
-    binary_input= params['train_ml_data_dir'] + params[binary_file]
+    binary_input= params['train_ml_data_dir'] + "/" + params[binary_file]
     print("writing out file {0}".format(binary_input))
     rs_binary_df.to_csv(binary_input, index=None)
     rs_tdf = rs_tdf.reset_index()
     rs_tdf = rs_tdf.rename({'compounds': "sample_names"},axis=1)
     ic50_file = 'data_' + split_type + "_file"    
-    data_input = params['train_ml_data_dir'] + params[ic50_file]
+    data_input = params['train_ml_data_dir'] + "/" + params[ic50_file]
     print("writing out file {0}".format(data_input))
     rs_tdf.to_csv(data_input, index_label="improve_id")
 
@@ -406,10 +357,14 @@ def cross_study_test_data(params):
         rs_tdf.to_csv(data_out, index_label="improve_id")
 
         
-def process_expression(tcga_file, expression_out):
-    ge = improve_utils.load_gene_expression_data(gene_system_identifier="Ensembl")
-    expression_tdf = ge.dropna()
+def process_expression(df, params):
+#    ge = improve_utils.load_gene_expression_data(gene_system_identifier="Ensembl")
+    tcga_file = params['tcga_file']
+    expression_out = params['fpkm_file']
+    expression_tdf = df.dropna()
+    expression_tdf = expression_tdf.set_index('improve_sample_id')
     expression_threshold = np.floor(0.1*len(expression_tdf))
+#    print((expression_df.astype(float) > 1).sum())
     to_keep = (expression_tdf.astype(float) > 1).sum() > expression_threshold
     f_log = (expression_tdf.loc[:,to_keep].astype(float) +1).apply(np.log2)
     f_log = f_log.loc[:, f_log.std() > 0.1]
@@ -423,16 +378,19 @@ def process_expression(tcga_file, expression_out):
 
 def creating_drug_and_smiles_input(df, params):
     #se = improve_utils.load_smiles_data()
-    se = df.set_index("improve_chem_id")
-    se.to_csv(smiles_out, index_label=None)
+    smiles_out = params['smiles_file']
+    drug_synonyms_out = params['drug_synonyms']
+#    print(df)
+#    se = df.set_index("improve_chem_id")
+    df.to_csv(smiles_out, index_label=None)
     #creating the synonmys file
-    improve_chem_list = se.index.tolist()
+    improve_chem_list = df.index.tolist()
     syn_list = []
     for x in improve_chem_list:
         str_x = "imporve_drug_for_" + str(x)
         syn_list.append(str_x)
-    se['syn'] = syn_list
-    drug_syn_df = se.drop(['smiles'], axis=1)
+    df['syn'] = syn_list
+    drug_syn_df = df.drop(['canSMILES'], axis=1)
     drug_syn_df.to_csv(drug_synonyms_out, header=None)
     print("smiles file downloaded and reformatted using improve utils {0} {1}".format(smiles_out,
                                                                                       drug_synonyms_out)) 
@@ -444,7 +402,6 @@ def filter_labels(df, syn, cells, drug_col):
         if 'rescreen' in str(i):
             to_check.append(i)
             to_check.append(i.split(' ')[0])
-            print(i)
     to_check
 
     ## remove those with less labels
@@ -482,7 +439,7 @@ def filter_labels(df, syn, cells, drug_col):
     df = df.loc[df.index!='improve_id']
     return df
 
-def preprocess_data(params, data_dir):
+def preprocess_data(params):
 #    ic50_file = params['data_input']
 #    binary_file = params['binary_input']
     split_type = ['train', 'val', 'test']
@@ -494,16 +451,15 @@ def preprocess_data(params, data_dir):
     data_clean_out = params['data_cleaned_out']
     for dt in split_type:
         binary_data = 'binary_' + dt + "_file"
-        binary_file = data_dir + params[binary_data]
+        binary_file = params['train_ml_data_dir'] + '/' + params[binary_data]
         ic50_data = 'data_' + dt + "_file"
-        ic50_file = data_dir + params[ic50_data]
+        ic50_file = params['train_ml_data_dir'] + '/' + params[ic50_data]
         data_cleaned_data = "data_cleaned_" + dt + "_out" 
-        data_cleaned_out = data_dir + params[data_cleaned_data]
+        data_cleaned_out = params[data_cleaned_data]
         data_bin_cleaned_data = "data_bin_cleaned_" + dt + "_out"
-        data_bin_cleaned_out = data_dir + params[data_bin_cleaned_data]
-        print(data_bin_cleaned_out)
+        data_bin_cleaned_out = params['train_ml_data_dir'] + '/' + params[data_bin_cleaned_data]
         data_tuples_data = "data_tuples_" + dt + "_out"
-        data_tuples_out = data_dir + params[data_tuples_data]
+        data_tuples_out = params['train_ml_data_dir'] + '/' + params[data_tuples_data]
         lnic50 = pd.read_csv(ic50_file, index_col=1, header=None)                                                 
         cells = lnic50.index[1:]
         df = lnic50.T
@@ -530,7 +486,6 @@ def preprocess_data(params, data_dir):
         bin_data = bin_data.replace(reps)
         bin_data = bin_data.sort_index()[cells]
         OUTFILE = data_bin_cleaned_out
-        print(OUTFILE)
         bin_data.to_csv(OUTFILE)
         print("Generated cleaned bin file {0}".format(OUTFILE))
         print("Binarized matrix size:", bin_data.shape)
@@ -556,7 +511,6 @@ def preprocess_data(params, data_dir):
         tuples.to_csv(OUTFILE)
         print("Generated tuple labels {0}".format(OUTFILE))
     final_dataframe = pd.concat(data_clean)
-    print(final_dataframe)
     final_dataframe.to_csv(data_clean_out)
     
 def preprocess_cross_study_data(params):
@@ -625,10 +579,10 @@ def preprocess_cross_study_data(params):
         print("Generated tuple labels {0}".format(OUTFILE))
 
     
-def generate_drug_descriptors(smiles_file, descriptor_out):
+def generate_drug_descriptors(df, params):
+    descriptor_out = params['descriptor_out']
     OUTFILE = descriptor_out
-
-    smiles = pd.read_csv(smiles_file, index_col=0)
+    smiles = df #pd.read_csv(smiles_file, index_col=0)
     smiles = smiles.dropna()
 
     allDes = [d[0] for d in Descriptors._descList]
@@ -636,7 +590,7 @@ def generate_drug_descriptors(smiles_file, descriptor_out):
 
     new_df = pd.DataFrame(index=smiles.index, columns=allDes)
     for drug in smiles.index:
-        x = smiles.loc[drug]['smiles']
+        x = smiles.loc[drug]['canSMILES']
         mol = Chem.MolFromSmiles(x)
         desc = calc.CalcDescriptors(mol)
         new_df.loc[drug] = desc
@@ -645,13 +599,13 @@ def generate_drug_descriptors(smiles_file, descriptor_out):
     print("Drug descriptor file generated at {0}".format(OUTFILE))
 
 
-def generate_morganprint(smiles_file, morgan_out):
-    OUTFILE = morgan_out
-    smiles = pd.read_csv(smiles_file, index_col=0)
+def generate_morganprint(smiles_df, params):
+    OUTFILE = params['train_ml_data_dir'] + '/' + params['morgan_out']
+    smiles = smiles_df #pd.read_csv(smiles_file, index_col=0)
     smiles = smiles.dropna()
     new_df = pd.DataFrame(index=smiles.index, columns=range(512))
     for drug in smiles.index:
-        x = smiles.loc[drug]['smiles']
+        x = smiles.loc[drug]['canSMILES']
         mol = Chem.MolFromSmiles(x)
         fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, 512)
         arr = np.zeros((0,), dtype=np.int8)
@@ -759,7 +713,7 @@ def leave_pairs_out(tuples, drugs):
     return tuples
 
 
-def generate_splits_anl(params, data_dir):
+def generate_splits_anl(params):
     expression_out = params['fpkm_file']
     split_type = ['train', 'val', 'test']
     morgan_out = params['morgan_data_out']
@@ -771,8 +725,8 @@ def generate_splits_anl(params, data_dir):
     tuples_label_fold_out = params['tuples_label_fold_out']
     for dt in split_type:
         count +=  1
-        data_bin_cleaned_out = data_dir + "/BiG_DRP_data_bined." + dt + ".csv"
-        tuples_labels_out = data_dir + "/BiG_DRP_data_tuples." + dt + ".csv"
+        data_bin_cleaned_out = params['train_ml_data_dir'] + "/BiG_DRP_data_bined." + dt + ".csv"
+        tuples_labels_out = params['train_ml_data_dir'] + "/BiG_DRP_data_tuples." + dt + ".csv"
         labels = pd.read_csv(data_bin_cleaned_out, index_col=0)
 #        print(labels)
         orig_cells_lab = labels.shape[1]
@@ -805,7 +759,6 @@ def generate_splits_anl(params, data_dir):
         print('current cells: %d'%len(labels.index) )
 
         tuples = pd.read_csv(tuples_labels_out, index_col=0)
-        print(tuples_labels_out)
         tuples['resistant'] = tuples['resistant'].astype(int)
         tuples['sensitive'] = (tuples['resistant'] + 1)%2
         # remove tuples that don't have drug or cell line data
@@ -831,18 +784,17 @@ def generate_splits_anl(params, data_dir):
         dataframes_list.append(df)
 
     final_dataframe = pd.concat(dataframes_list, ignore_index=True)
-    print(tuples_label_fold_out)
     final_dataframe.to_csv(tuples_label_fold_out)
     
 
 def write_out_constants(params):
     constant_file = "utils/constants.py"
     with open(constant_file, 'w+') as fout:
-        _LABEL_FILE = params['tuples_label_fold_out'].split("Data")[1] 
-        _GENE_EXPRESSION_FILE = params['fpkm_file'].split("Data")[1]
-        _LABEL_MATRIX_FILE = params['data_cleaned_out'].split("Data")[1]
-        _DRUG_DESCRIPTOR_FILE = params['descriptor_out'].split("Data")[1]
-        _MORGAN_FP_FILE = params['morgan_data_out'].split("Data")[1]
+        _LABEL_FILE = params['tuples_label_fold_out']#.split("Data")[1] 
+        _GENE_EXPRESSION_FILE = params['fpkm_file']#.split("Data")[1]
+        _LABEL_MATRIX_FILE = params['data_cleaned_out']#.split("Data")[1]
+        _DRUG_DESCRIPTOR_FILE = params['descriptor_out']#.split("Data")[1]
+        _MORGAN_FP_FILE = params['morgan_data_out']#.split("Data")[1]
         fout.write("_LABEL_FILE = '{0}'".format(_LABEL_FILE) + '\n')
         fout.write("_GENE_EXPRESSION_FILE = '{0}'".format(_GENE_EXPRESSION_FILE) + '\n')
         fout.write("_LABEL_MATRIX_FILE = '{0}'".format(_LABEL_MATRIX_FILE) + '\n')
@@ -859,6 +811,61 @@ def run(params):
         pass
     print(params)
 
+
+def download_anl_data(params: Dict, inputdtd: frm.DataPathDict):
+    csa_data_folder = os.path.join(os.environ['CANDLE_DATA_DIR'], 'csa_data', 'raw_data')
+    print(csa_data_folder)
+#    splits_dir = os.path.join(csa_data_folder, 'splits') 
+#    x_data_dir = os.path.join(csa_data_folder, 'x_data')
+#    y_data_dir = os.path.join(csa_data_folder, 'y_data')
+#    improve_data_url = params['improve_data_url']
+#    data_type = params['data_type']
+#    data_type_list = data_type.split(",")
+    print("data downloaded dir is {0}".format(csa_data_folder))
+    if not os.path.exists(csa_data_folder):
+        print('creating folder: %s'%csa_data_folder)
+        os.makedirs(csa_data_folder)
+        mkdir(splits_dir)
+        mkdir(x_data_dir)
+        mkdir(y_data_dir)
+#    fname = [inputdtd["x_data_path"] / fname for fname in params["x_data_files"]]
+#    for f in fname:
+#        if f.exists() == False:
+#            raise Exception(f"ERROR ! File '{fname}' file not found.\n")
+#    print(fname)
+#    df_drug = drp.load_drug_data(fname)
+#    print("\nLoading omics data...")
+    oo = drp.OmicsLoader(params)
+    ge = oo.dfs['cancer_gene_expression.tsv']
+    process_expression(ge, params) 
+    dd = drp.DrugsLoader(params)
+    smi = dd.dfs['drug_SMILES.tsv']
+    #params['drug_synonyms']
+    smd = dd.dfs['drug_ecfp4_nbits512.tsv']
+    creating_drug_and_smiles_input(smi,params)
+    generate_drug_descriptors(smi, params)
+    generate_morganprint(smi, params)
+    stages = {"train": params["train_split_file"],
+              "val": params["val_split_file"],
+              "test": params["test_split_file"]}
+    scaler = None
+    for stage, split_file in stages.items():
+        rr = drp.DrugResponseLoader(params, split_file=split_file, verbose=True)
+        df_response = rr.dfs["response.tsv"]
+        ydf, df_canc = drp.get_common_samples(df1=df_response, df2=ge,
+                                              ref_col=params["canc_col_name"])
+        create_big_drp_data(ydf, stage, params)
+        #print(ydf[[params["canc_col_name"], params["drug_col_name"]]].nunique())
+
+
+
+#    url_dir = improve_data_url + "/y_data/"
+#    response_file  = 'response.tsv'
+#    candle.file_utils.get_file(fname=response_file, origin=url_dir + response_file,
+#                                   datadir=y_data_dir,
+#                                   cache_subdir=None)
+
+
     
 def candle_main(anl):
     params = initialize_parameters()
@@ -871,14 +878,14 @@ def candle_main(anl):
 #        create_data_inputs(params, data_dir)
 #        cross_study_test_data(params)
 #        creating_drug_and_smiles_input(params['smiles_file'], params['drug_synonyms'])
-#        download_author_data(params, data_dir) 
+        download_author_data(params, data_dir) 
 #        process_expression(params['tcga_file'], params['fpkm_file'])
-#        preprocess_data(params, data_dir)
+        preprocess_data(params)
 #        preprocess_cross_study_data(params)
 #        generate_drug_descriptors(params['smiles_file'], params['descriptor_out'])
 #        generate_morganprint(params['smiles_file'], params['morgan_data_out'])
-#        generate_splits_anl(params, data_dir)
-#        write_out_constants(params)
+        generate_splits_anl(params)
+        write_out_constants(params)
 #    else:
 #        download_author_data(params, data_dir)
 #        write_out_constants(params)
