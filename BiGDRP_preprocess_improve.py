@@ -1,4 +1,5 @@
-import candle
+import sys
+#import candle
 import os
 import json
 import shutil
@@ -45,35 +46,37 @@ filepath = Path(__file__).resolve().parent
 required=None
 additional_definitions=None
 
+
 # This should be set outside as a user environment variable
-os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/BiG-DRP'
+#os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/BiG-DRP'
 
 #parent path
 fdir = Path('__file__').resolve().parent
-source = "csa_data/raw_data/splits/"
+#source = "csa_data/raw_data/splits/"
 auc_threshold=0.5
 
 
 drp_preproc_params = [
     {"name": "x_data_canc_files",  # app;                                                                                            
-     # "nargs": "+",                                                                                                                 
+     #"nargs": "+",                                                                                                                 
      "type": str,
      "help": "List of feature files.",
     },
     {"name": "x_data_drug_files",  # app;                                                                                            
-     # "nargs": "+",                                                                                                                 
+     #"nargs": "+",                                                                                                                 
      "type": str,
      "help": "List of feature files.",
     },
     {"name": "y_data_files",  # imp;                                                                                                 
-     # "nargs": "+",                                                                                                                 
+     #"nargs": "+",                                                                                                                 
      "type": str,
      "help": "List of output files.",
     },
-    # {"name": "data_set",                                                                                                           
-    #  "type": str,                                                                                                                  
-    #  "help": "Data set to preprocess.",                                                                                           
-    # },                                                                                 
+    {"name": "expression_out",
+     "default" : "BiG_DRP_fpkm.csv",
+      "type": str,                                                                                                                  
+      "help": "Data set to preprocess.",                                                                                           
+     },                                                                                 
     {"name": "split_id",                                                                                                           
       "type": int,                                                                                                                  
       "default": 0,                                                                                                                 
@@ -107,20 +110,6 @@ preprocess_params = drp_preproc_params
 req_preprocess_args = [ll["name"] for ll in preprocess_params]  # TODO: it seems that all args specifiied to be 'req'. Why?          
 req_preprocess_args.extend(["y_col_name", "model_outdir"])    
 
-# initialize class
-class BiG_drp_candle(candle.Benchmark):
-    def set_locals(self):
-        """
-        Functionality to set variables specific for the benchmark
-        - required: set of required parameters for the benchmark.
-        - additional_definitions: list of dictionaries describing the additional parameters for the benchmark.
-        """
-        if required is not None: 
-            self.required = set(required)
-        if additional_definitions is not None:
-            self.additional_definisions = additional_definitions
-
-            
 def initialize_parameters():
     params = frm.initialize_parameters(
         filepath,
@@ -150,35 +139,25 @@ def raw_data_available(params: Dict) -> frm.DataPathDict:
         raise Exception(f"ERROR ! {mainpath} not found.\n")
 
     inpath = mainpath / params["raw_data_dir"]
+    print(inpath)
     if inpath.exists() == False:
         raise Exception(f"ERROR ! {inpath} not found.\n")
 
     x_data_dir = inpath / params["x_data_dir"]
     y_data_dir = inpath / params["y_data_dir"]
     splits_dir = inpath / "splits"
- #   xpath = frm.check_path_and_files(x_data_dir, params["x_data_files"], inpath)
+    #xpath = frm.check_path_and_files(x_data_dir, params["x_data_files"], inpath)
     ypath = frm.check_path_and_files(y_data_dir, params["y_data_files"][0], inpath)
     spath = frm.check_path_and_files('raw_data/splits', [], inpath)
     return {"y_data_path": ypath, "splits_path": spath}
 #    return {"x_data_path": xpath, "y_data_path": ypath, "splits_path": spath}
 
 
-def preprocess(params, data_dir):
-    preprocessed_dir = data_dir + "/preprocessed"
-#    drug_feature_dir = data_dir + "/drp-data/grl-preprocessed/drug_features/"
-#    drug_response_dir = data_dir + "/drp-data/grl-preprocessed/drug_response/"
-    sanger_tcga_dir = data_dir + "/drp-data/grl-preprocessed/sanger_tcga/"
-    cross_study = data_dir + "/cross_study"
-    supplementary_dir =  data_dir + '/BiG_DRP_data/supplementary/'
- #   mkdir(drug_feature_dir)
- #   mkdir(drug_response_dir)
-    mkdir(sanger_tcga_dir)
-    mkdir(preprocessed_dir)
-    mkdir(cross_study)
-    mkdir(supplementary_dir)
-    args = candle.ArgumentStruct(**params)
+def preprocess_param_inputs(params):
+    supplementary_dir = os.path.join(os.environ['IMPROVE_DATA_DIR'], 'BiG-DRP/supplementary/')
+    preprocessed_dir = os.path.join(os.environ['IMPROVE_DATA_DIR'], 'BiG-DRP/preprocessed/')
     params = frm.build_paths(params)  
-    processed_outdir = frm.create_ml_data_outdir(params)
+#    processed_outdir = frm.create_outdir(params)
     drug_synonym_file = params['train_ml_data_dir'] + "/" + params['drug_synonyms']
     gene_expression_file = params['train_ml_data_dir'] + "/" + params['expression_out']
     ln50_file = params['train_ml_data_dir'] + "/" + params['data_file']
@@ -189,7 +168,6 @@ def preprocess(params, data_dir):
     data_tuples_out = params['train_ml_data_dir'] + '/' + params['data_tuples_out']
     tuples_label_fold_out = params['train_ml_data_dir'] + '/' + params['labels']
     smiles_file = params['train_ml_data_dir'] + '/' +params['smiles_file']
-    params['cross_study'] = cross_study
     params['data_bin_cleaned_out'] = data_bin_cleaned_out
     params['data_input'] = params['train_ml_data_dir'] + "/" + params['data_file']
     params['binary_input'] = params['train_ml_data_dir'] + "/" + params['binary_file']
@@ -206,7 +184,7 @@ def preprocess(params, data_dir):
     params['raw_data_dir'] = '.'
     params['x_data_dir'] = 'raw_data/x_data'
     params['y_data_dir'] = 'raw_data/y_data'
-    params['dataroot'] = data_dir
+    params['dataroot'] = os.environ['IMPROVE_DATA_DIR']
     params['folder'] = params['model_outdir']
     params['outroot'] = params['model_outdir']
     params['network_perc'] = params['network_percentile']
@@ -239,12 +217,12 @@ def check_data_available(params: Dict) -> frm.DataPathDict:
     return inputdtd, outputdtd
     
     
-def download_author_data(params, data_dir):
-    print("downloading file: %s"%params['data_url'])
-    data_download_filepath = candle.get_file(params['original_data'], params['data_url'],
-                                             datadir = data_dir,
-                                             cache_subdir = None)
-    return(params)
+#def download_author_data(params, data_dir):
+#    print("downloading file: %s"%params['data_url'])
+#    data_download_filepath = candle.get_file(params['original_data'], params['data_url'],
+#                                             datadir = data_dir,
+#                                             cache_subdir = None)
+#    return(params)
 
 
 class MyEncoder(JSONEncoder):
@@ -364,8 +342,11 @@ def process_expression(df, params):
     expression_tdf = df.dropna()
     expression_tdf = expression_tdf.set_index('improve_sample_id')
     expression_threshold = np.floor(0.1*len(expression_tdf))
+    print('expression threshold is:')
+    print(expression_threshold)
 #    print((expression_df.astype(float) > 1).sum())
     to_keep = (expression_tdf.astype(float) > 1).sum() > expression_threshold
+#    print(to_keep)
     f_log = (expression_tdf.loc[:,to_keep].astype(float) +1).apply(np.log2)
     f_log = f_log.loc[:, f_log.std() > 0.1]
     tcga = pd.read_csv(tcga_file, index_col=0)
@@ -784,6 +765,8 @@ def generate_splits_anl(params):
         dataframes_list.append(df)
 
     final_dataframe = pd.concat(dataframes_list, ignore_index=True)
+    print('this is tuples label fold out')
+    print(tuples_label_fold_out)
     final_dataframe.to_csv(tuples_label_fold_out)
     
 
@@ -801,31 +784,14 @@ def write_out_constants(params):
         fout.write("_DRUG_DESCRIPTOR_FILE = '{0}'".format(_DRUG_DESCRIPTOR_FILE) + '\n')
         fout.write("_MORGAN_FP_FILE = '{0}'".format(_MORGAN_FP_FILE) + '\n')        
         
-def run(params):
-    params['data_type'] = str(params['data_type'])
-    json_out = params['output_dir']+'/params.json'
-    try:
-        with open (json_out, 'w') as fp:
-            json.dump(params, fp, indent=4, cls=MyEncoder)
-    except AttributeError:
-        pass
-    print(params)
-
 
 def download_anl_data(params: Dict, inputdtd: frm.DataPathDict):
-    csa_data_folder = os.path.join(os.environ['CANDLE_DATA_DIR'], 'csa_data', 'raw_data')
-    print(csa_data_folder)
-#    splits_dir = os.path.join(csa_data_folder, 'splits') 
-#    x_data_dir = os.path.join(csa_data_folder, 'x_data')
-#    y_data_dir = os.path.join(csa_data_folder, 'y_data')
-#    improve_data_url = params['improve_data_url']
-#    data_type = params['data_type']
-#    data_type_list = data_type.split(",")
+    csa_data_folder = os.path.join(os.environ['IMPROVE_DATA_DIR'], 'raw_data')
     print("data downloaded dir is {0}".format(csa_data_folder))
     if not os.path.exists(csa_data_folder):
         print('creating folder: %s'%csa_data_folder)
         os.makedirs(csa_data_folder)
-        mkdir(splits_dir)
+#        mkdir(splits_dir)
         mkdir(x_data_dir)
         mkdir(y_data_dir)
 #    fname = [inputdtd["x_data_path"] / fname for fname in params["x_data_files"]]
@@ -866,33 +832,40 @@ def download_anl_data(params: Dict, inputdtd: frm.DataPathDict):
 #                                   cache_subdir=None)
 
 
-    
-def candle_main(anl):
-    params = initialize_parameters()
-    data_dir = os.environ['CANDLE_DATA_DIR'] + "/Data/"
-    params =  preprocess(params, data_dir)
-#    print(params)
-    if params['improve_analysis'] == 'yes' or anl:
-        inputd, outputd = check_data_available(params)
-        download_anl_data(params, inputd)
-#        create_data_inputs(params, data_dir)
-#        cross_study_test_data(params)
-#        creating_drug_and_smiles_input(params['smiles_file'], params['drug_synonyms'])
-        download_author_data(params, data_dir) 
-#        process_expression(params['tcga_file'], params['fpkm_file'])
-        preprocess_data(params)
-#        preprocess_cross_study_data(params)
-#        generate_drug_descriptors(params['smiles_file'], params['descriptor_out'])
-#        generate_morganprint(params['smiles_file'], params['morgan_data_out'])
-        generate_splits_anl(params)
-        write_out_constants(params)
-#    else:
-#        download_author_data(params, data_dir)
-#        write_out_constants(params)
-        
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('-a', dest='anl',  default=False)
-    args = parser.parse_args()
-    candle_main(args.anl)
+def run(params):
+    params['data_type'] = str(params['data_type'])
+#    params = frm.build_paths(params)
+    params = preprocess_param_inputs(params)
+    json_out = params['output_dir']+'/params.json'
+    try:
+        with open (json_out, 'w') as fp:
+            json.dump(params, fp, indent=4, cls=MyEncoder)
+    except AttributeError:
+        pass
+    inputd, outputd = check_data_available(params)
+    download_anl_data(params, inputd)
+#    download_author_data(params, data_dir)
+    preprocess_data(params)
+    generate_splits_anl(params)
+    write_out_constants(params)
 
+
+
+def main(args):
+    additional_definitions = preprocess_params
+    params = frm.initialize_parameters(
+        filepath,
+        default_model="BiG_DRP_model.txt",
+        # default_model="lgbm_params_ws.txt",
+        # default_model="lgbm_params_cs.txt",
+        additional_definitions=additional_definitions,
+        # required=req_preprocess_params,
+        required=None,
+    )
+    print(params)
+    ml_data_outdir = run(params)
+    print("\nFinished data preprocessing.")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

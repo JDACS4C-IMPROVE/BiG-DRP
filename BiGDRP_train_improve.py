@@ -221,7 +221,7 @@ def nested_cross_validation(FLAGS, drug_feats, cell_lines, labels,
             train_tuples, 
             train_x, val_x, 
             train_y, val_y, 
-            train_mask, val_mask, drug_feats, FLAGS.network_perc)
+            train_mask, val_mask, drug_feats, FLAGS.network_percentile)
 
         val_error,_,_ = fold_validation(hp, FLAGS.seed, network, train_data, 
                                         val_data, cl_tensor, df_tensor, tuning=False, 
@@ -257,7 +257,7 @@ def nested_cross_validation(FLAGS, drug_feats, cell_lines, labels,
             train_tuples, 
             train_x, test_x, 
             train_y, test_y, 
-            train_mask, test_mask.values, drug_feats, FLAGS.network_perc)
+            train_mask, test_mask.values, drug_feats, FLAGS.network_percentile)
 
         test_error, trainer, metric_names = fold_validation(hp, FLAGS.seed, network, train_data, 
                                                             test_data, cl_tensor, df_tensor, tuning=False, 
@@ -327,7 +327,7 @@ def anl_test_data(FLAGS, drug_feats, cell_lines, labels,
                                                                              train_x, val_x, 
                                                                              train_y, val_y,
                                                                              drug_feats, 
-                                                                             FLAGS.network_perc)
+                                                                             FLAGS.network_percentile)
 
     val_error,_,_ = fold_validation(hp, FLAGS.seed, network, 
                                     train_data, val_data, 
@@ -358,7 +358,7 @@ def anl_test_data(FLAGS, drug_feats, cell_lines, labels,
     network, train_data, test_data, cl_tensor, df_tensor = create_dataset_anl(train_tuples, 
                                                                               train_x, test_x, 
                                                                               train_y, test_y, 
-                                                                              drug_feats, FLAGS.network_perc)
+                                                                              drug_feats, FLAGS.network_percentile)
 
     test_error, trainer, metric_names = fold_validation(hp, FLAGS.seed, network, 
                                                         train_data, 
@@ -366,8 +366,8 @@ def anl_test_data(FLAGS, drug_feats, cell_lines, labels,
                                                         epoch=hp['num_epoch'], maxout=True) 
 
     test_metrics = pd.DataFrame(test_error, columns=metric_names)
-    test_metrics.to_csv(params['model_outdir'] + "/fold_%d.csv", index=False)
-#    test_metrics.to_csv(FLAGS.model_outdir + "/results/fold_%d.csv", index=False)
+#    test_metrics.to_csv( + "/fold_%d.csv", index=False)
+    test_metrics.to_csv(FLAGS.model_outdir + "/results/fold_%d.csv", index=False)
 
     drug_enc = trainer.get_drug_encoding().cpu().detach().numpy()
     pd.DataFrame(drug_enc, index=drug_list).to_csv(FLAGS.model_outdir + '/results/encoding_fold_%d.csv')
@@ -387,19 +387,22 @@ def anl_test_data(FLAGS, drug_feats, cell_lines, labels,
     TSS = np.sum((true_label - label_mean) ** 2)
     RSS = np.sum((prediction - prediction_mean) ** 2)    
     rmse = np.sqrt(((prediction - true_label)**2).mean())
-    scc, _ = spearmanr(true_label, prediction)
+    scc, _ = spearmanr(label_flat, prediction_flat) 
+#    scc, _ = spearmanr(true_label, prediction)
     pcc, _ = pearsonr(label_flat,prediction_flat)
-    r2 = 1 - (RSS/TSS)
+    r2 = r2_score(label_flat,prediction_flat) 
     prediction_matrix = pd.DataFrame(prediction_matrix, index=test_samples, columns=drug_list)
     prediction_matrix.to_csv(FLAGS.model_outdir + "/results/val_prediction_fold_%d.csv")
-    final_metrics = pd.DataFrame([test_error[-1]], columns=metric_names)
-    final_metrics = final_metrics.T
+#    final_metrics = pd.DataFrame([test_error[-1]], columns=metric_names)
 #    final_metrics = pd.DataFrame(test_error[-1])
 #    final_metrics = final_metrics.T
 #    final_metrics.colums = metric_names
-#    final_metrics = [test_error[-1], rmse, r2, pcc]
-#    final_metrics = pd.DataFrame(final_metrics)
-#    final_metrics.columns = ['MSE', "RMSE", "R2", "PCC"]
+    final_metrics = [rmse, r2, pcc, scc]
+#    print(final_metrics)
+#    final_metrics = pd.DataFrame(final_metrics, columns=metric_names)
+    final_metrics = pd.DataFrame(final_metrics)
+    final_metrics = final_metrics.T    
+    final_metrics.columns = ["RMSE", "R2", "PCC", "SCC"]
     return final_metrics
 
 
@@ -417,21 +420,21 @@ def main(drp_params, params):
                                                                           data_cleaned_out,
                                                                           descriptor_out,
                                                                           morgan_out)
-#    test_metrics = anl_test_data(FLAGS, drug_feats, cell_lines, labels,label_matrix, normalizer, 
-#                                 params['learning_rate'], params['epochs'], params['batch_size'])
+    test_metrics = anl_test_data(FLAGS, drug_feats, cell_lines, labels,label_matrix, normalizer, 
+                                 params['learning_rate'], params['epochs'], params['batch_size'])
 #    test_metrics = nested_cross_validation(FLAGS, drug_feats, cell_lines, labels,
 #                                           label_matrix, normalizer, learning_rate, epoch, batch_size)
 
-#    test_metrics = test_metrics.mean(axis=0)
-#    print(test_metrics)
-#    print("Overall Performance")
-#    print("MSE: %f"%test_metrics[0])
+ #   test_metrics = test_metrics.mean(axis=0)
+    print(test_metrics)
+    print("Overall Performance")
+    print("RMSE: %f"%test_metrics[0])
 #    print("RMSE: %f"%np.sqrt(test_metrics[0]))
-#    print("R2: %f"%test_metrics[1])
-#    print("Pearson: %f"%test_metrics[2])
-#    print("Spearman: %f"%test_metrics[3])
-#    print("Note: This is not the per-drug performance that is reported in the paper")
-#    print("To obtain per-drug performance, use metrics/calculate_metrics.py")
+    print("R2: %f"%test_metrics[1])
+    print("Pearson: %f"%test_metrics[2])
+    print("Spearman: %f"%test_metrics[3])
+    print("Note: This is not the per-drug performance that is reported in the paper")
+    print("To obtain per-drug performance, use metrics/calculate_metrics.py")
 #    test_out = 'test_results.csv'
 #    test_metrics.to_csv(test_out, index=False)
 

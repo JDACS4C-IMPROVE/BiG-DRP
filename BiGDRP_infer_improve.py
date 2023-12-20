@@ -3,12 +3,12 @@ import numpy as np
 from scipy.stats import spearmanr
 from argparse import Namespace
 from utils.data_initializer import initialize
-from utils.data_initializer import initialize_crossstudy
+#from utils.data_initializer import initialize_crossstudy
 import json
 from pathlib import Path
 from typing import Dict
 import torch
-from torch_geometric.data import DataLoader
+#from torch_geometric.data import DataLoader
 from improve import framework as frm
 import argparse
 from sklearn.metrics import roc_auc_score
@@ -18,10 +18,18 @@ from tqdm import tqdm
 import os
 from  bigdrp.model import BiGDRP
 #import train as bmk
-import candle
+#import candle
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from BiGDRP_train_improve import metrics_list, model_preproc_params, model_train_params
+from BiGDRP_train_improve import metrics_list, model_train_params
+import sys
+import pandas as pd
+from improve import framework as frm
+from improve.metrics import compute_metrics
+# Model-specifc imports
+from model_utils.utils import extract_subset_fea
+# [Req] Imports from preprocess and train scripts
+from BiGDRP_preprocess_improve import preprocess_params
 
 #from bigdrp.trainer import Trainer
 #from utils.tuple_dataset import TupleMatrixDataset
@@ -29,8 +37,16 @@ from BiGDRP_train_improve import metrics_list, model_preproc_params, model_train
 # Just because the tensorflow warnings are a bit verbose
 filepath = Path(__file__).resolve().parent
 
-# [Req] App-specific params (App: monotherapy drug response prediction)
+
 app_infer_params = []
+
+
+model_infer_params = []
+
+
+infer_params = app_infer_params + model_infer_params
+
+req_preprocess_args = [ll["name"] for ll in model_train_params]
 
 def load_predictions(folder, split, fold_mask, file_prefix='val_prediction_fold'):
     preds = []
@@ -202,89 +218,11 @@ def launch(args):
     )
 
     return test_scores
-#    folder = args.folder
-#    data_dir = os.environ['CANDLE_DATA_DIR'] + "/Data/"
-#    drug_response_dir = data_dir + "BiG_DRP_data/drp-data/grl-preprocessed/drug_response/"
-#    drugset = data_dir + "/" + args.drugset
-    # load labels
-#    labels = drug_response_dir + "/" + args.labels
-#    y_tup = pd.read_csv(labels, index_col=0)
-#    if args.split == 'lpo':
-#        y_tup['fold'] = y_tup['pair_fold']
-#    else:
-#        y_tup['fold'] = y_tup['cl_fold']
-        
-#    y_tup = y_tup.loc[y_tup['fold']>=0]
-#    y = y_tup.pivot(index='cell_line', columns='drug', values='response')
-#    y_bin = y_tup.pivot(index='cell_line', columns='drug', values='resistant')
-    
-#    samples = list(y_tup['cell_line'].unique())
-
-    # load drugs
-#    drugs = open(drugset).read().split('\n')
-#    if drugs[-1] == '': drugs=drugs[:-1]
-
-    # filter out unnecessary samples/drugs
-#    y_tup = y_tup.loc[y_tup['drug'].isin(drugs)]
-#    y = y.loc[samples, drugs]
-#    y_bin = y_bin.loc[samples, drugs] # binary response
-    
-#   y0 = y.replace(np.nan, 0)
-#    null_mask = y0.values.nonzero()
-#    y_norm = (y - y.mean())/y.std()   # normalized response
-
-#    print("calculating for %d drugs and %d cell lines..."%(len(drugs), len(samples)))
-        
-    # create mask for folds
-    # NOTE: This code assumes that all (drug, CCL) pairs can only exist in 1 fold
-#    fold_mask = y_tup.pivot(index='cell_line', columns='drug', values='fold')
-#    fold_mask = fold_mask.loc[samples, drugs]
-    
-    # load predictions
-#    _, df = load_predictions(folder, split=args.split, fold_mask=fold_mask)
-#    df = df.loc[samples, drugs]
-#    preds_norm = df                      # actual prediction for normalized response
-#    preds_unnorm = df*y.std() + y.mean() # if we revert back to unnormalized response
-    
-    # Calculate overall metrics
-#    print('calculating overall metrics...')
-    
-#    mets = ["spearman (fold.%d)"%i for i in range(5)]
-#    overall = pd.DataFrame(index=mets, columns=['normalized %s'%args.response, 'raw %s'%args.response])
-#    scores = overall
-#    s = np.zeros((5, 2))
-#    for i in range(5):
-#        m  = ((fold_mask == i)*1).values.nonzero()
-#        s[i, 0] = spearmanr(y_norm.values[m], preds_norm.values[m])[0]
-#        s[i, 1] = spearmanr(y.values[m], preds_unnorm.values[m])[0]
-#    overall.loc[mets] = s
-#    overall.loc['spearman (fold.mean)'] = s.mean(axis=0)
-#    overall.loc['spearman (fold.stdev)'] = s.std(axis=0)
-#    outfile = '%s/%s_performance_%d_drugs.xlsx'%(args.results_dir, args.split, len(drugs))
-#    exwrite = pd.ExcelWriter(outfile)#, engine='xlsxwriter')
-#    overall.to_excel(exwrite, sheet_name='Overall')
-        
-#    if args.mode == 'collate':
-#        per_drug_metric = get_per_drug_metric(preds_norm, y_norm, y_bin)
-#    elif args.mode == 'per_fold':
-#        per_drug_metric = get_per_drug_fold_metric(preds_norm, y_norm, fold_mask, y_bin)
-#    per_drug_metric = per_drug_metric.sort_values('SCC', ascending=False)
-
-#    drug_summary = pd.DataFrame(index=per_drug_metric.columns, columns=['mean', 'stdev'])
-#    drug_summary['mean'] = per_drug_metric.mean()
-#    drug_summary['stdev'] = per_drug_metric.std()
-#    print(drug_summary)
-
-#    per_drug_metric.to_excel(exwrite, sheet_name='Drug')
-#    drug_summary.to_excel(exwrite, sheet_name='Summary Drug')
-#    exwrite.save()
-#    print("Results written to: %s"%outfile)
-#    return scores
         
     
 def run(gParameters):
     print("In Run Function:\n")
-    args = candle.ArgumentStruct(**gParameters)
+#    args = candle.ArgumentStruct(**gParameters)
     # Call launch() with specific model arch and args with all HPs
     scores = launch(args)
     print('printing scores ...')
@@ -294,36 +232,17 @@ def run(gParameters):
         json.dump(scores.to_json(), f, ensure_ascii=False, indent=4)
     return scores
 
-#def run_cross_study(gParameters, cell_lines, data_input_tuple, data_label):
-#    load_model(gParameters, cell_lines, data_input_tuple, data_label)
-#    scores = launch(args, test_data)
-    
-
-class BiG_drp_candle(candle.Benchmark):
-    def set_locals(self):
-        """
-        Functionality to set variables specific for the benchmark
-        - required: set of required parameters for the benchmark.
-        - additional_definitions: list of dictionaries describing the additional parameters for the benchmark.
-        """
-        if required is not None: 
-            self.required = set(required)
-        if additional_definitions is not None:
-            self.additional_definisions = additional_definitions
     
 def initialize_parameters():
-    preprocessor_bmk = BiG_drp_candle(file_path,
-        'BiG_DRP_model.txt',
-        'pytorch',
-        prog='BiG_drp_candle',
-        desc='Data Preprocessor'
+    params = frm.initialize_parameters(
+        filepath,
+        default_model="BiG_DRP_model.txt",
+        additional_definitions=model_train_params,
+        required=req_preprocess_args,
     )
-    #Initialize parameters
-    candle_data_dir = os.getenv("CANDLE_DATA_DIR")
-    gParameters = candle.finalize_parameters(preprocessor_bmk)
-    return gParameters
+    return params
 
-    
+   
 def run_cross_study(params, study, gene_expression, label_matrix, test_data_tup):
     ns = Namespace(**params)
     FLAGS = ns
@@ -402,26 +321,43 @@ def run_infer(study, study_label, study_matrix):
     study_r2 = r2_score(study_ys, study_results)
     print(study_r2)
 
-def candle_main(ANL=True):
-    params = initialize_parameters()
-    candle_data_dir = os.getenv("CANDLE_DATA_DIR")
-    data_dir = os.environ['CANDLE_DATA_DIR'] + "/Data/"
-    cross_study_dir = data_dir + "/" + params['cross_study_dir']
-    data_type_list = params['data_type'].split(',')
-    gene_expression = data_dir + "/drp-data/grl-preprocessed/sanger_tcga/BiG_DRP_fpkm.csv"
-#    label_matrix = data_dir + "/drp-data/grl-preprocessed//drug_response/BiG_DRP_data_cleaned.csv"
-    if ANL:
-        for dt in data_type_list:
-            print(dt)
-            test_data_tup = cross_study_dir + "/" + dt + "_tuples_test.csv"
-            print(test_data_tup)
-            test_data_cleaned = cross_study_dir + "/" + dt + "_cleaned_test.csv"
-            assert(os.path.isfile(test_data_tup))
-            cross_study_scores = run_cross_study(params, dt, gene_expression, test_data_cleaned, test_data_tup)
-    else:
-#        run_infer(study, study_label, study_matrix)
-        print("Done inference.")
 
-    
+def main(args):
+    additional_definitions = preprocess_params + train_params + infer_params
+    params = frm.initialize_parameters(
+        filepath,
+        default_model="lgbm_params.txt",
+        # default_model="lgbm_params_ws.txt",
+        # default_model="lgbm_params_cs.txt",
+        additional_definitions=additional_definitions,
+        # required=req_infer_params,
+        required=None,
+    )
+    test_scores = run(params)
+    print("\nFinished model inference.")
+
 if __name__ == "__main__":
-    candle_main()
+    main(sys.argv[1:])
+#def candle_main(ANL=True):
+#    params = initialize_parameters()
+#    candle_data_dir = os.getenv("CANDLE_DATA_DIR")
+#    data_dir = os.environ['CANDLE_DATA_DIR'] + "/Data/"
+#    cross_study_dir = data_dir + "/" + params['cross_study_dir']
+#    data_type_list = params['data_type'].split(',')
+#    gene_expression = data_dir + "/drp-data/grl-preprocessed/sanger_tcga/BiG_DRP_fpkm.csv"
+#    label_matrix = data_dir + "/drp-data/grl-preprocessed//drug_response/BiG_DRP_data_cleaned.csv"
+#    if ANL:
+#        for dt in data_type_list:
+#            print(dt)
+#            test_data_tup = cross_study_dir + "/" + dt + "_tuples_test.csv"
+#            print(test_data_tup)
+#            test_data_cleaned = cross_study_dir + "/" + dt + "_cleaned_test.csv"
+#            assert(os.path.isfile(test_data_tup))
+#            cross_study_scores = run_cross_study(params, dt, gene_expression, test_data_cleaned, test_data_tup)
+#    else:
+#        run_infer(study, study_label, study_matrix)
+#        print("Done inference.")
+#
+#    
+#if __name__ == "__main__":
+#    candle_main()
