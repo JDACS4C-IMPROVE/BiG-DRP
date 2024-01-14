@@ -113,7 +113,6 @@ def fold_validation(hyperparams, seed, network, train_data, val_data,
 
     n_genes = cell_lines.shape[1]
     n_drug_feats = drug_feats.shape[1]
-    print(n_drug_feats)
     trainer = Trainer(n_genes, cell_lines, drug_feats, network, hyperparams)
     print("number of epochs is {0}".format(epoch))
     val_error, metric_names = trainer.fit(
@@ -223,7 +222,7 @@ def nested_cross_validation(FLAGS, drug_feats, cell_lines, labels,
             train_y, val_y, 
             train_mask, val_mask, drug_feats, FLAGS.network_percentile)
 
-        val_error,_,_ = fold_validation(hp, FLAGS.seed, network, train_data, 
+        val_error,bd_model,_ = fold_validation(hp, FLAGS.seed, network, train_data, 
                                         val_data, cl_tensor, df_tensor, tuning=False, 
                                         epoch=hp['num_epoch'], maxout=False)
 
@@ -329,7 +328,7 @@ def anl_test_data(FLAGS, drug_feats, cell_lines, labels,
                                                                              drug_feats, 
                                                                              FLAGS.network_percentile)
 
-    val_error,_,_ = fold_validation(hp, FLAGS.seed, network, 
+    val_error,bd_model,_ = fold_validation(hp, FLAGS.seed, network, 
                                     train_data, val_data, 
                                     cl_tensor, df_tensor,
                                     tuning=False, 
@@ -366,7 +365,7 @@ def anl_test_data(FLAGS, drug_feats, cell_lines, labels,
                                                         epoch=hp['num_epoch'], maxout=True) 
 
     test_metrics = pd.DataFrame(test_error, columns=metric_names)
-#    test_metrics.to_csv( + "/fold_%d.csv", index=False)
+#    test_metrics.to_cv( + "/fold_%d.csv", index=False)
     test_metrics.to_csv(FLAGS.model_outdir + "/results/fold_%d.csv", index=False)
 
     drug_enc = trainer.get_drug_encoding().cpu().detach().numpy()
@@ -422,19 +421,16 @@ def main(drp_params, params):
                                                                           morgan_out)
     test_metrics = anl_test_data(FLAGS, drug_feats, cell_lines, labels,label_matrix, normalizer, 
                                  params['learning_rate'], params['epochs'], params['batch_size'])
-#    test_metrics = nested_cross_validation(FLAGS, drug_feats, cell_lines, labels,
-#                                           label_matrix, normalizer, learning_rate, epoch, batch_size)
-
  #   test_metrics = test_metrics.mean(axis=0)
     print(test_metrics)
-    print("Overall Performance")
-    print("RMSE: %f"%test_metrics[0])
+#    print("Overall Performance")
+#    print("RMSE: %f"%test_metrics[0])
 #    print("RMSE: %f"%np.sqrt(test_metrics[0]))
-    print("R2: %f"%test_metrics[1])
-    print("Pearson: %f"%test_metrics[2])
-    print("Spearman: %f"%test_metrics[3])
-    print("Note: This is not the per-drug performance that is reported in the paper")
-    print("To obtain per-drug performance, use metrics/calculate_metrics.py")
+#    print("R2: %f"%test_metrics[1])
+#    print("Pearson: %f"%test_metrics[2])
+#    print("Spearman: %f"%test_metrics[3])
+#    print("Note: This is not the per-drug performance that is reported in the paper")
+#    print("To obtain per-drug performance, use metrics/calculate_metrics.py")
 #    test_out = 'test_results.csv'
 #    test_metrics.to_csv(test_out, index=False)
 
