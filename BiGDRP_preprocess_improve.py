@@ -159,7 +159,7 @@ def preprocess_param_inputs(params):
     supplementary_dir = os.path.join(os.environ['IMPROVE_DATA_DIR'], 'BiG-DRP/supplementary/')
     preprocessed_dir = os.path.join(os.environ['IMPROVE_DATA_DIR'], 'BiG-DRP/preprocessed/')
     params = frm.build_paths(params)  
-#    processed_outdir = frm.create_outdir(params)
+    processed_outdir = frm.create_outdir(params['train_ml_data_dir'])
     drug_synonym_file = params['train_ml_data_dir'] + "/" + params['drug_synonyms']
     gene_expression_file = params['train_ml_data_dir'] + "/" + params['expression_out']
     ln50_file = params['train_ml_data_dir'] + "/" + params['data_file']
@@ -791,7 +791,7 @@ def download_anl_data(params: Dict, inputdtd: frm.DataPathDict):
     if not os.path.exists(csa_data_folder):
         print('creating folder: %s'%csa_data_folder)
         os.makedirs(csa_data_folder)
-#        mkdir(splits_dir)
+        mkdir(splits_dir)
         mkdir(x_data_dir)
         mkdir(y_data_dir)
 #    fname = [inputdtd["x_data_path"] / fname for fname in params["x_data_files"]]
@@ -834,7 +834,7 @@ def download_anl_data(params: Dict, inputdtd: frm.DataPathDict):
 
 def run(params):
     params['data_type'] = str(params['data_type'])
-#    params = frm.build_paths(params)
+    params = frm.build_paths(params)
     params = preprocess_param_inputs(params)
     json_out = params['output_dir']+'/params.json'
     try:

@@ -64,7 +64,6 @@ def run_infer(percentile, drug_feats, cell_lines, labels, label_matrix, normaliz
             to the metrics_list.
     """
     # import ipdb; ipdb.set_trace()
-
     frm.create_outdir(outdir=params["infer_outdir"])
     test_data_fname = frm.build_ml_data_name(params, stage="test")
     learning_rate = params['learning_rate']
@@ -77,6 +76,7 @@ def run_infer(percentile, drug_feats, cell_lines, labels, label_matrix, normaliz
     train_y = label_matrix.loc[train_samples].values
     drug_list = list(drug_feats.index)
     test_tuples = labels.loc[labels['cl_fold'] == 3]
+    test_tuples = test_tuples[~test_tuples['response'].isna()]
     test_samples = list(test_tuples['cell_line'].unique())
     test_x = cell_lines.loc[test_samples].values
     test_y = label_matrix.loc[test_samples].values
@@ -102,8 +102,34 @@ def run_infer(percentile, drug_feats, cell_lines, labels, label_matrix, normaliz
     test_data = DataLoader(test_data, batch_size=infer_batch_size, shuffle=False)
     drug_enc = model.get_drug_encoding().cpu().detach().numpy()
     prediction_matrix = model.predict_matrix(test_data, drug_encoding=torch.Tensor(drug_enc))
-    print(prediction_matrix)
+    prediction = prediction_matrix
+    true_label = test_y
+    prediction_flat = prediction#.flatten()
+    label_flat =  true_label.squeeze()
+#    label_flat = true_label.flatten()
+    non_nan_mask = ~np.isnan(label_flat) & ~np.isnan(prediction_flat)
+    label_flat = label_flat[non_nan_mask]
+    prediction_flat = prediction_flat[non_nan_mask]
+    r2 = r2_score(label_flat,prediction_flat)
+    prediction_mean = np.mean(prediction)
+    label_mean = np.mean(true_label)
+    TSS = np.sum((true_label - label_mean) ** 2)
+    RSS = np.sum((prediction - prediction_mean) ** 2)    
+    rmse = np.sqrt(((prediction - true_label)**2).mean())
+    scc, _ = spearmanr(label_flat, prediction_flat) 
+    pcc, _ = pearsonr(label_flat,prediction_flat)
+    frm.store_predictions_df(
+        params,
+        y_true=label_flat, y_pred=prediction_flat, stage="test",
+        outdir=params["infer_outdir"]
+    )
+    test_scores = frm.compute_performace_scores(
+        params,
+        y_true=label_flat, y_pred=prediction_flat, stage="test",
+        outdir=params["infer_outdir"], metrics=metrics_list
+    )
 
+    return test_scores
 
 def launch(params, drp_params):
     frm.create_outdir(outdir=params["infer_outdir"])
@@ -112,11 +138,6 @@ def launch(params, drp_params):
 #    print(f"test_batch: {params['test_batch']}")
     test_data_fname = frm.build_ml_data_name(params, stage="test")
     test_data_fname = test_data_fname.split(params["data_format"])[0]
- #    test_loader = build_GraphDRP_dataloader(params["test_ml_data_dir"],
-#                                             test_data_fname,
-#                                             params["test_batch"],
-#                                             shuffle=False)
-#    device = determine_device(params["cuda_name"])
     modelpath = frm.build_model_path(params, model_dir=params["model_dir"])
     ns = Namespace(**drp_params)
     FLAGS = ns
@@ -132,8 +153,7 @@ def launch(params, drp_params):
                                                                           descriptor_out,
                                                                           morgan_out)
     run_infer(FLAGS.network_percentile, drug_feats, cell_lines, labels, label_matrix, normalizer, params)
-#    print(labels)FLAGS.network_percentile
-#    print(lab
+
 
 
 def main(args):
@@ -153,6 +173,7 @@ def main(args):
                                                'split', 'weight_folder', 'epochs',
                                                'infer_batch_size', 'learning_rate'))
     test_scores = launch(params, drp_params)
+    print(test_scores)
     print("\nFinished model inference.")
 
 if __name__ == "__main__":

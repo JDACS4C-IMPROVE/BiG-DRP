@@ -6,16 +6,15 @@ data_type='CTRPv2,CCLE,GDSCv1,GDSCv2,gCSI'
 improve_analysis='yes'
 
 [Preprocess]
-train_split_file = "gCSI_split_0_train.txt"
-val_split_file = "gCSI_split_0_val.txt"
-test_split_file = "gCSI_split_0_test.txt"
-ml_data_outdir = "./ml_data/gCSI-gCSI/split_0"
+train_split_file = "CTRPv2_split_0_train.txt"
+val_split_file = "CTRPv2_split_0_val.txt"
+test_split_file = "CTRPv2_split_0_test.txt"
+ml_data_outdir = "./ml_data/CTRPv2/split_0"
 data_format = ".pt"
 #x_data_files = 
 x_data_canc_files = [["cancer_gene_expression.tsv", ["Ensembl"]]]
 x_data_drug_files = [["drug_SMILES.tsv"], ["drug_ecfp4_nbits512.tsv"]]
 y_data_files = [["response.tsv"]]
-
 
 [Train]
 metric='auc'
@@ -28,12 +27,12 @@ mode = "collate"
 seed = 0
 response = 'auc'
 normalize_response = "True"
-train_ml_data_dir = "./ml_data/gCSI-gCSI/split_0"
-val_ml_data_dir = "./ml_data/gCSI-gCSI/split_0"
-model_outdir = "./out_models/gCSI/split_0"
+train_ml_data_dir = "./ml_data/CTRPv2/split_0"
+val_ml_data_dir = "./ml_data/CTRPv2/split_0"
+model_outdir = "./out_models/CTRPv2/split_0"
 model_file_name = "model"
 model_file_format = ".pt"
-epochs = 150
+epochs = 300
 batch_size = 256
 val_batch = 256
 loss = "mse"
@@ -45,9 +44,9 @@ log_interval = 20
 cuda_name = "cuda:5"
 
 [Test]
-infer_ml_data_dir = "./ml_data/gCSI-gCSI/split_0"
-infer_model_dir = "./out_models/gCSI/split_0"
-infer_outdir = "./out_infer/gCSI-gCSI/split_0"
+infer_ml_data_dir = "./ml_data/CCLE/split_0"
+infer_model_dir = "./out_models/GDSCv1/split_0"
+infer_outdir = "./out_infer/CCLE/split_0"
 infer_batch_size = 256
 infer_cuda_name = "cuda:6"
 
