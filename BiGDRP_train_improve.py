@@ -310,7 +310,7 @@ def anl_test_data(FLAGS, drug_feats, cell_lines, labels,
     drug_list = list(drug_feats.index)
 
     train_tuples = labels.loc[labels['cl_fold'] == 1]
-    train_tuples = labels
+#    train_tuples = labels
     train_samples = list(train_tuples['cell_line'].unique())
     train_x = cell_lines.loc[train_samples].values
     train_y = label_matrix.loc[train_samples].values
@@ -322,6 +322,8 @@ def anl_test_data(FLAGS, drug_feats, cell_lines, labels,
     train_tuples = reindex_tuples(train_tuples, drug_list, train_samples) # all drugs exist in all folds
 
     train_x, val_x = normalizer(train_x, val_x)
+#    print('this is train tuples')
+#    print(train_tuples, FLAGS.network_percentile)
     network, train_data, val_data, cl_tensor, df_tensor = create_dataset_anl(train_tuples, 
                                                                              train_x, val_x, 
                                                                              train_y, val_y,

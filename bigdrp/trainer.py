@@ -267,3 +267,12 @@ class Trainer:
         f = open(directory+"/model_config_fold_%d.txt"%fold_id,"w")
         f.write(x)
         f.close()
+
+    def load_state_dict(self, state_dict):
+        """
+        Load the model's state dictionary.
+
+        Parameters:
+            state_dict (dict): The state dictionary to load.
+        """
+        self.model.load_state_dict(state_dict)

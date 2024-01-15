@@ -128,7 +128,9 @@ def mv_file(download_file, req_file):
 
 def raw_data_available(params: Dict) -> frm.DataPathDict:
     """                                                                                                                             
-    Sweep the expected raw data folder and check that files needed for cross-study analysis (CSA) are available.                         :params: Dict params: Dictionary of parameters read                                                                                  :return: Path to directories requested stored in dictionary with str key str and Path value.                                   
+    Sweep the expected raw data folder and check that files needed for cross-study analysis (CSA) are available. 
+    :params: Dict params: Dictionary of parameters read  
+    :return: Path to directories requested stored in dictionary with str key str and Path value.                                   
     :rtype: DataPathDict                                                                                                             
     """
     # Expected                                                                                                                     
@@ -199,7 +201,7 @@ def preprocess_param_inputs(params):
 
 def check_data_available(params: Dict) -> frm.DataPathDict:
     """                                                                                                                              
-    Sweep the expected input paths and check that raw data files needed for preprocessing are available.                                                                                                            
+    Sweep the expected input paths and check that raw data files needed for preprocessing are available. 
     :params: Dict params: Dictionary of parameters read                                                                          
     :return: Path to directories requested stored in dictionary with str key str and Path value.                                 
     :rtype: DataPathDict                                                                                                             
@@ -450,8 +452,7 @@ def preprocess_data(params):
         data_clean.append(df)
         print("Data matrix size:", df.shape)
         drugs = list(df.index)
-
-        # BINARIZED DATA                                                                                                                        
+        # BINARIZED DATA                                                                                                                   
         print("\n\nProcessing binarized data...")
         bin_data = pd.read_csv(binary_file, index_col=0, header=None)
         bin_data.loc['compounds'] = bin_data.loc['compounds']#.str.lower()
@@ -599,7 +600,6 @@ def generate_morganprint(smiles_df, params):
     
 def generate_drug_smiles(data_bin_cleaned_out, smiles_out):
     drugs = pd.read_csv(data_bin_cleaned_out, index_col=0).index
-
     drugs_smiles = pd.DataFrame()
     no_data = []
     for d in drugs:

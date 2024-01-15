@@ -2,8 +2,10 @@ import pandas as pd
 import numpy as np
 from scipy.stats import spearmanr
 from argparse import Namespace
+from utils.utils import mkdir, reindex_tuples, moving_average, reset_seed, create_fold_mask
 from utils.data_initializer import initialize
 #from utils.data_initializer import initialize_crossstudy
+from utils.network_gen import create_network
 import json
 from pathlib import Path
 from typing import Dict
@@ -24,6 +26,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from BiGDRP_train_improve import metrics_list, model_train_params
 import sys
 #from BiGDRP.model import BiGDRP
+from bigdrp.trainer import Trainer
 import pandas as pd
 from improve import framework as frm
 from improve.metrics import compute_metrics
@@ -42,13 +45,15 @@ infer_params = app_infer_params + model_infer_params
 
 
 
-def load_trainer(network, hyperparams, filepath):
-    trainer = Trainer(network=network, hyperparams=hyperparams)
+def load_trainer(n_genes, cell_lines, drug_feats, network, hyperparams, filepath):
+    drug_feats_tensor = torch.tensor(drug_feats.values, dtype=torch.float32)
+    cell_lines_tensor = torch.tensor(cell_lines.values, dtype=torch.float32)
+    trainer = Trainer(n_genes, cell_lines_tensor, drug_feats_tensor, network, hyperparams)
     trainer.load_state_dict(torch.load(filepath))
     return trainer
 
 
-def run_infer(params: Dict):
+def run_infer(percentile, drug_feats, cell_lines, labels, label_matrix, normalizer, params):
     """ Run model inference.
 
     Args:
@@ -63,35 +68,41 @@ def run_infer(params: Dict):
     frm.create_outdir(outdir=params["infer_outdir"])
     test_data_fname = frm.build_ml_data_name(params, stage="test")
     learning_rate = params['learning_rate']
-    epoch = params['epoch']
-    batch_size = params['infer_batch_size']
+    epoch = params['epochs']
+    infer_batch_size = params['infer_batch_size']
 
-    test_tuples = params['']
-    cell_lines = params['']
-    label_matrix = params['']
-    #    test_tuples = labels.loc[labels['cl_fold'] == 3]
+    train_tuples = labels.loc[labels['cl_fold'] == 1]
+    train_samples = list(train_tuples['cell_line'].unique())
+    train_x = cell_lines.loc[train_samples].values
+    train_y = label_matrix.loc[train_samples].values
+    drug_list = list(drug_feats.index)
+    test_tuples = labels.loc[labels['cl_fold'] == 3]
     test_samples = list(test_tuples['cell_line'].unique())
     test_x = cell_lines.loc[test_samples].values
     test_y = label_matrix.loc[test_samples].values
-
-#    network = params['network_percentile']
+    n_genes = cell_lines.shape[1]
+    train_tuples = train_tuples[['drug', 'cell_line', 'response']]
+    train_tuples = reindex_tuples(train_tuples, drug_list, train_samples) # all drugs exist in all folds
+    train_x, test_x = normalizer(train_x, test_x)
+#    print(train_tuples, percentile)
+    network = create_network(train_tuples, percentile)
     hyperparams = {
         'learning_rate': learning_rate,
         'num_epoch': epoch,
-        'batch_size': batch_size,
+        'batch_size': infer_batch_size,
         'common_dim': 512,
         'expr_enc': 1024,
         'conv1': 512,
         'conv2': 512,
         'mid': 512,
         'drop': 1}
-    model = load_trainer(network, hyperparams, filepath)
-
+    filepath = params['infer_model_dir'] + "/results/model_weights_fold_anl.pt"  
+    model = load_trainer(n_genes, cell_lines, drug_feats, network, hyperparams, filepath)
     test_data = TensorDataset(torch.FloatTensor(test_x))
-    test_data = DataLoader(test_data, batch_size=hyperparams['batch_size'], shuffle=False)
-
-    prediction_matrix = trainer.predict_matrix(test_data, drug_encoding=torch.Tensor(drug_enc))
-    print(model)
+    test_data = DataLoader(test_data, batch_size=infer_batch_size, shuffle=False)
+    drug_enc = model.get_drug_encoding().cpu().detach().numpy()
+    prediction_matrix = model.predict_matrix(test_data, drug_encoding=torch.Tensor(drug_enc))
+    print(prediction_matrix)
 
 
 def launch(params, drp_params):
@@ -120,7 +131,8 @@ def launch(params, drp_params):
                                                                           data_cleaned_out,
                                                                           descriptor_out,
                                                                           morgan_out)
-    print(label_matrix)
+    run_infer(FLAGS.network_percentile, drug_feats, cell_lines, labels, label_matrix, normalizer, params)
+#    print(labels)FLAGS.network_percentile
 #    print(lab
 
 
