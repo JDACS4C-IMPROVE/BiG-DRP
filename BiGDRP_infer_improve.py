@@ -75,7 +75,8 @@ def run_infer(percentile, drug_feats, cell_lines, labels, label_matrix, normaliz
     train_x = cell_lines.loc[train_samples].values
     train_y = label_matrix.loc[train_samples].values
     drug_list = list(drug_feats.index)
-    test_tuples = labels.loc[labels['cl_fold'] == 3]
+    test_tuples = labels.loc[labels['cl_fold'] == 2]
+#    test_tuples = labels.loc[labels['cl_fold'] == 3]
     test_tuples = test_tuples[~test_tuples['response'].isna()]
     test_samples = list(test_tuples['cell_line'].unique())
     test_x = cell_lines.loc[test_samples].values
