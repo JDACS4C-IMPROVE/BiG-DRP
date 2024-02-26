@@ -1,0 +1,85 @@
+[Global_Params]
+model_name = "BiG-DRP"
+
+[Preprocess]
+train_split_file = "GDSCv1_split_0_train.txt"
+val_split_file = "GDSCv1_split_0_val.txt"
+test_split_file = "CCLE_all.txt"
+ml_data_outdir = "./ml_data/GDSCv1-CCLE/split_0"
+data_format = ".pt"
+x_data_canc_files = [["cancer_gene_expression.tsv", ["Ensembl"]]]
+x_data_drug_files = [["drug_SMILES.tsv"], ["drug_ecfp4_nbits512.tsv"]]
+y_data_files = [["response.tsv"]]
+
+
+[Train]
+metric='auc'
+auc_threshold=0.8
+learning_rate = 0.0001
+network_percentile = 3
+drug_feat = 'desc'
+split = "lco"
+mode = "collate"
+seed = 0
+response = 'auc'
+normalize_response = "True"
+train_ml_data_dir = "./ml_data/GDSCv1-CCLE/split_0"
+val_ml_data_dir = "./ml_data/GDSCv1-CCLE/split_0"
+model_outdir = "./out_models/GDSCv1/split_0"
+model_file_name = "model"
+model_file_format = ".pt"
+epochs = 300
+batch_size = 256
+val_batch = 256
+loss = "mse"
+early_stop_metric = "mse"
+patience = 20
+ckpt_save_interval = 5
+model_arch = "GINConvNet"
+log_interval = 20
+cuda_name = "cuda:5"
+
+[Infer]
+test_ml_data_dir = "./ml_data/GDSCv1-CCLE/split_0"
+model_dir = "./out_models/GDSCv1/split_0"
+infer_outdir = "./out_infer/GDSCv1-CCLE/split_0"
+test_batch = 256
+cuda_name = "cuda:7"
+
+[files]
+original_data='BiG_DRP_data.tar.gz'
+tcga_file = 'tcga_one_sample.csv'
+drug_synonyms = "drug_synonyms.txt"
+expression_out = "BiG_DRP_fpkm.csv"
+morgan_out = 'BiG_DRP_morgan.csv'
+descriptor_out = 'BiG_DRP_descriptors.csv'
+smiles_file = 'BiG_DRP_smiles.csv'
+drugset = "drug_list.txt"
+data_file = 'ln_ic50.csv'
+binary_file = "binary_response.csv"
+labels = 'BiG_DRP_tuple_labels_folds.csv'
+data_cleaned_out = "BiG_DRP_data_cleaned.csv"
+data_tuples_out = "BiG_DRP_data_tuples.csv"
+tuples_label_fold_out = "BiG_DRP_tuple_labels_folds.csv"
+data_bin_cleaned_out = "BiG_DRP_data_bined.csv"
+data_train_file = 'ln_ic50.train.csv'
+binary_train_file = "binary_response.train.csv"
+labels_train = 'BiG_DRP_tuple_labels.train.csv'
+data_cleaned_train_out = "BiG_DRP_data_cleaned.train.csv"
+data_tuples_train_out = "BiG_DRP_data_tuples.train.csv"
+tuples_label_train_out = "BiG_DRP_tuples_train.csv"
+data_bin_cleaned_train_out = "BiG_DRP_data_bined.train.csv"
+data_val_file = 'ln_ic50.val.csv'
+binary_val_file = "binary_response.val.csv"
+labels_val = 'BiG_DRP_tuple_labels.val.csv'
+data_cleaned_val_out = "BiG_DRP_data_cleaned.val.csv"
+data_tuples_val_out = "BiG_DRP_data_tuples.val.csv"
+tuples_label_val_out = "BiG_DRP_tuples_val.csv"
+data_bin_cleaned_val_out = "BiG_DRP_data_bined.val.csv"
+data_test_file = 'ln_ic50.test.csv'
+binary_test_file = "binary_response.test.csv"
+labels_test = 'BiG_DRP_tuple_labels.test.csv'
+data_cleaned_test_out = "BiG_DRP_data_cleaned.test.csv"
+data_tuples_test_out = "BiG_DRP_data_tuples.test.csv"
+tuples_label_fold_test_out = "BiG_DRP_tuples.test.csv"
+data_bin_cleaned_test_out = "BiG_DRP_data_bined.test.csv"

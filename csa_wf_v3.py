@@ -17,7 +17,7 @@ import BiGDRP_preprocess_improve
 import BiGDRP_infer_improve
 
 # from ap_utils.classlogger import Logger
-from ap_utils.utils import get_print_func, Timer
+#from ap_utils.utils import get_print_func, Timer
 
 fdir = Path(__file__).resolve().parent
 

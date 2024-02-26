@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from utils.tuple_dataset import TupleMatrixDataset
 from utils.utils import mkdir, reindex_tuples, moving_average, reset_seed, create_fold_mask
@@ -148,7 +149,7 @@ def create_dataset(tuples, train_x, val_x,
 def create_dataset_anl(tuples, train_x, val_x, 
     train_y, val_y, drug_feats, percentile):
     network = create_network(tuples, percentile)
-
+    print(network)
     train_data = TupleMatrixDataset( 
         tuples,
         torch.FloatTensor(train_x),

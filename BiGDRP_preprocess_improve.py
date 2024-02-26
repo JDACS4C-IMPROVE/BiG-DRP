@@ -7,8 +7,6 @@ from typing import Dict
 from typing import List
 from pathlib import Path
 from json import JSONEncoder
-from utils.utils import mkdir
-#from Big_DRP_train import main
 os.environ['NUMEXPR_MAX_THREADS']='6'
 from pathlib import Path
 import numexpr as ne
@@ -119,6 +117,17 @@ def initialize_parameters():
     )
     return params
 
+def mkdir(directory):
+    directories = directory.split("/")   
+
+    folder = ""
+    for d in directories:
+        folder += d + '/'
+        if not os.path.exists(folder):
+            print('creating folder: %s'%folder)
+            os.mkdir(folder)
+
+            
 def mv_file(download_file, req_file):
     if os.path.isfile(req_file):
         pass
@@ -234,7 +243,7 @@ class MyEncoder(JSONEncoder):
 
 def convert_to_binary(x):
     if not np.isnan(x):
-        if x > auc_threshold:
+        if x < auc_threshold:
             return "S"
         else:
             return "R"
