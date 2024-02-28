@@ -46,7 +46,8 @@ additional_definitions=None
 
 
 # This should be set outside as a user environment variable
-#os.environ['CANDLE_DATA_DIR'] = os.environ['HOME'] + '/improve_data_dir/BiG-DRP'
+CANDLE_DATA_DIR=os.environ['CANDLE_DATA_DIR'] 
+IMPROVE_DATA_DIR=os.environ['CANDLE_DATA_DIR']
 
 #parent path
 fdir = Path('__file__').resolve().parent
@@ -243,7 +244,7 @@ class MyEncoder(JSONEncoder):
 
 def convert_to_binary(x):
     if not np.isnan(x):
-        if x < auc_threshold:
+        if x > auc_threshold:
             return "S"
         else:
             return "R"

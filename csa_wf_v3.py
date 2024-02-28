@@ -5,7 +5,7 @@ import warnings
 import subprocess
 from pathlib import Path
 import pandas as pd
-
+from time import time
 # IMPROVE imports
 from improve import framework as frm
 # import improve_utils
@@ -18,6 +18,26 @@ import BiGDRP_infer_improve
 
 # from ap_utils.classlogger import Logger
 #from ap_utils.utils import get_print_func, Timer
+
+fdir = Path(__file__).resolve().parent
+
+
+class Timer:
+  """ Measure time. """
+  def __init__(self):
+    self.start = time()
+
+  def timer_end(self):
+    self.end = time()
+    return self.end - self.start
+
+  def display_timer(self, print_fn=print):
+    time_diff = self.timer_end()
+    if time_diff // 3600 > 0:
+        print_fn("Runtime: {:.1f} hrs".format( (time_diff)/3600) )
+    else:
+        print_fn("Runtime: {:.1f} mins".format( (time_diff)/60) )
+
 
 fdir = Path(__file__).resolve().parent
 
@@ -179,7 +199,7 @@ for source_data_name in source_datasets:
             # import pdb; pdb.set_trace()
             preprocess_run = ["python",
                   # "graphdrp_preprocess_improve.py",
-                  "lgbm_preprocess_improve.py",
+                  "BiGDRP_preprocess_improve.py",
                   "--train_split_file", str(train_split_file),
                   "--val_split_file", str(val_split_file),
                   "--test_split_file", str(test_split_file),
@@ -216,7 +236,7 @@ for source_data_name in source_datasets:
                 # import pdb; pdb.set_trace()
                 train_run = ["python",
                       # "graphdrp_train_improve.py",
-                      "lgbm_train_improve.py",
+                      "BiGDRP_train_improve.py",
                       "--train_ml_data_dir", str(train_ml_data_dir),
                       "--val_ml_data_dir", str(val_ml_data_dir),
                       "--model_outdir", str(model_outdir),
@@ -248,7 +268,7 @@ for source_data_name in source_datasets:
             # import pdb; pdb.set_trace()
             infer_run = ["python",
                   # "graphdrp_infer_improve.py",
-                  "lgbm_infer_improve.py",
+                  "BiGDRP_infer_improve.py",
                   "--test_ml_data_dir", str(test_ml_data_dir),
                   "--model_dir", str(model_dir),
                   "--infer_outdir", str(infer_outdir),

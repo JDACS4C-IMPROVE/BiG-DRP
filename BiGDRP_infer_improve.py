@@ -43,7 +43,8 @@ app_infer_params = []
 model_infer_params = []
 infer_params = app_infer_params + model_infer_params
 
-
+CANDLE_DATA_DIR=os.environ['CANDLE_DATA_DIR'] 
+IMPROVE_DATA_DIR=os.environ['CANDLE_DATA_DIR']
 
 def load_trainer(n_genes, cell_lines, drug_feats, network, hyperparams, filepath):
     drug_feats_tensor = torch.tensor(drug_feats.values, dtype=torch.float32)
@@ -165,17 +166,18 @@ def main(args):
         additional_definitions=additional_definitions,
         required=None,
     )
-    drp_params = dict((k, params[k]) for k in ('descriptor_out', 'expression_out','morgan_out','data_cleaned_out',
-                                               'labels', 'tuples_label_fold_out', 'infer_ml_data_dir',
-                                               'infer_model_dir', 'infer_outdir',  
-                                               'dataroot', 'drug_feat',
-                                               'model_outdir', 'mode', 'network_percentile',
-                                               'normalize_response', 'seed',
-                                               'split', 'weight_folder', 'epochs',
-                                               'infer_batch_size', 'learning_rate'))
-    test_scores = launch(params, drp_params)
-    print(test_scores)
-    print("\nFinished model inference.")
+    print(params)
+#    drp_params = dict((k, params[k]) for k in ('descriptor_out', 'expression_out','morgan_out','data_cleaned_out',
+#                                               'labels', 'tuples_label_fold_out', 'infer_ml_data_dir',
+#                                               'infer_model_dir', 'infer_outdir',  
+#                                               'dataroot', 'drug_feat',
+#                                               'model_outdir', 'mode', 'network_percentile',
+#                                               'normalize_response', 'seed',
+#                                               'split', 'weight_folder', 'epochs',
+#                                               'infer_batch_size', 'learning_rate'))
+#    test_scores = launch(params, drp_params)
+#    print(test_scores)
+#    print("\nFinished model inference.")
 
 if __name__ == "__main__":
     main(sys.argv[1:])
