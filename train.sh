@@ -5,7 +5,9 @@
 # arg 3 CANDLE_CONFIG
 
 ### Path to your CANDLEized model's main Python script###
+
 CANDLE_MODEL=BiGDRP_train_improve.py
+
 
 ### Set env if CANDLE_MODEL is not in same directory as this script
 IMPROVE_MODEL_DIR=${IMPROVE_MODEL_DIR:-$( dirname -- "$0" )}

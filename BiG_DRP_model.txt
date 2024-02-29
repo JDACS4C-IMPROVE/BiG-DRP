@@ -1,6 +1,7 @@
 [Global_Params]
 model_name = 'BiG-DRP'
 data_url="http://chia.team/IMPROVE_data/BiG_DRP_data.tar.gz"
+
 train_data_type='GDSCv1'
 data_type='CTRPv2,CCLE,GDSCv1,GDSCv2,gCSI'
 
@@ -21,10 +22,12 @@ metric='auc'
 auc_threshold=0.8
 learning_rate = 0.0001
 network_percentile = 3
+
 drug_feat = 'desc'
 split = "lco"
 mode = "collate"
 seed = 0
+
 response = 'auc'
 normalize_response = "True"
 train_ml_data_dir = "./ml_data/GDSCv1/split_0"
@@ -65,6 +68,7 @@ labels = 'BiG_DRP_tuple_labels_folds.csv'
 data_cleaned_out = "BiG_DRP_data_cleaned.csv"
 data_tuples_out = "BiG_DRP_data_tuples.csv"
 tuples_label_fold_out = "BiG_DRP_tuple_labels_folds.csv"
+
 data_bin_cleaned_out = "BiG_DRP_data_bined.csv"
 data_train_file = 'ln_ic50.train.csv'
 binary_train_file = "binary_response.train.csv"
@@ -90,7 +94,9 @@ data_bin_cleaned_test_out = "BiG_DRP_data_bined.test.csv"
 
 
 [Directories]
+
 dataroot="."
 expression_dir = "sanger_tcga/"
+
 
 
