@@ -92,10 +92,6 @@ data_bin_cleaned_test_out = "BiG_DRP_data_bined.test.csv"
 
 [Directories]
 dataroot="."
-cross_study_dir = "cross_study/"
-drug_feature_dir = "drug_feature/"
-drug_response_dir = "drug_response/"
 expression_dir = "sanger_tcga/"
-weight_folder = ""
 
 

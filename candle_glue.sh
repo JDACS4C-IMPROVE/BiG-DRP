@@ -1,2 +1,2 @@
 #!/bin/bash
-python preprocess_new.py
+python BiGDRP_preprocess_improve.py

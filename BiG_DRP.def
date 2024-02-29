@@ -43,8 +43,12 @@ From: pytorch/pytorch:1.12.0-cuda11.3-cudnn8-devel
 	python3 -m pip install git+https://github.com/ECP-CANDLE/candle_lib@develop
 
 	git clone -b develop https://github.com/JDACS4C-IMPROVE/BiG-DRP.git .
+	git clone -b develop https://github.com/JDACS4C-IMPROVE/IMPROVE.git .
+	PYTHONPATH=$PAYTHONPATH:/usr/local/IMPROVE
+	export $PYTHONPATH
 	cd BiG-DRP
 	python3 -m pip install -r requirements.txt
+	
 
 	chmod a+x *.sh
 	chmod a+x *.py
