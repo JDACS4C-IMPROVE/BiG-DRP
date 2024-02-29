@@ -48,7 +48,6 @@ infer_ml_data_dir = "./ml_data/GDSCv2/split_0/"
 infer_model_dir = "./out_models/GDSCv1/split_0"
 infer_outdir = "./out_infer/GDSCv2/split_0"
 infer_batch_size = 256
-infer_cuda_name = "cuda:6"
 
 
 [files]
