@@ -1,38 +1,30 @@
 [Global_Params]
-model_name = 'BiG-DRP'
-data_url="http://chia.team/IMPROVE_data/BiG_DRP_data.tar.gz"
-
-train_data_type='GDSCv1'
-data_type='CTRPv2,CCLE,GDSCv1,GDSCv2,gCSI'
-
+model_name = "BiG-DRP"
 
 [Preprocess]
 train_split_file = "GDSCv1_split_0_train.txt"
 val_split_file = "GDSCv1_split_0_val.txt"
 test_split_file = "GDSCv1_split_0_test.txt"
-ml_data_outdir = "./ml_data/GDSCv1/split_0"
+ml_data_outdir = "./ml_data/GDSCv1-GDSCv1/split_0"
 data_format = ".pt"
-#x_data_files = 
 x_data_canc_files = [["cancer_gene_expression.tsv", ["Ensembl"]]]
 x_data_drug_files = [["drug_SMILES.tsv"], ["drug_ecfp4_nbits512.tsv"]]
 y_data_files = [["response.tsv"]]
 
 [Train]
+train_ml_data_dir = "./ml_data/GDSCv1-GDSCv1/split_0"
+val_ml_data_dir = "./ml_data/GDSCv1-GDSCv1/split_0"
+model_outdir = "./out_models/GDSCv1/split_0"
 metric='auc'
 auc_threshold=0.8
 learning_rate = 0.0001
 network_percentile = 3
-
 drug_feat = 'desc'
 split = "lco"
 mode = "collate"
 seed = 0
-
 response = 'auc'
 normalize_response = "True"
-train_ml_data_dir = "./ml_data/GDSCv1/split_0"
-val_ml_data_dir = "./ml_data/GDSCv1/split_0"
-model_outdir = "./out_models/GDSCv1/split_0"
 model_file_name = "model"
 model_file_format = ".pt"
 epochs = 300
@@ -46,12 +38,13 @@ model_arch = "GINConvNet"
 log_interval = 20
 cuda_name = "cuda:5"
 
-[Test]
-infer_ml_data_dir = "./ml_data/GDSCv2/split_0/"
-infer_model_dir = "./out_models/GDSCv1/split_0"
-infer_outdir = "./out_infer/GDSCv2/split_0"
-infer_batch_size = 256
 
+[Infer]
+test_ml_data_dir = "./ml_data/GDSCv1-GDSCv1/split_0"
+model_dir = "./out_models/GDSCv1/split_0"
+infer_outdir = "./out_infer/GDSCv1-GDSCv1/split_0"
+test_batch = 256
+cuda_name = "cuda:7"
 
 [files]
 original_data='BiG_DRP_data.tar.gz'
@@ -68,7 +61,6 @@ labels = 'BiG_DRP_tuple_labels_folds.csv'
 data_cleaned_out = "BiG_DRP_data_cleaned.csv"
 data_tuples_out = "BiG_DRP_data_tuples.csv"
 tuples_label_fold_out = "BiG_DRP_tuple_labels_folds.csv"
-
 data_bin_cleaned_out = "BiG_DRP_data_bined.csv"
 data_train_file = 'ln_ic50.train.csv'
 binary_train_file = "binary_response.train.csv"
@@ -91,12 +83,3 @@ data_cleaned_test_out = "BiG_DRP_data_cleaned.test.csv"
 data_tuples_test_out = "BiG_DRP_data_tuples.test.csv"
 tuples_label_fold_test_out = "BiG_DRP_tuples.test.csv"
 data_bin_cleaned_test_out = "BiG_DRP_data_bined.test.csv"
-
-
-[Directories]
-
-dataroot="."
-expression_dir = "sanger_tcga/"
-
-
-

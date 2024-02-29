@@ -6,6 +6,9 @@ results/
 *.ipynb
 .ipynb_checkpoints/
 Data/
+ml_data/
 preprocessing/
 csa_data/
 output/
+out_infer
+

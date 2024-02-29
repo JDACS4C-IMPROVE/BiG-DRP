@@ -15,7 +15,9 @@ def initialize(FLAGS, LABEL_FILE, GENE_EXPRESSION_FILE, LABEL_MATRIX_FILE, DRUG_
                binary=False, multitask=False):
 
     reset_seed(FLAGS.seed)
-    mkdir(FLAGS.outroot + "/results/" + FLAGS.folder)
+    mkdir(FLAGS.model_outdir + "/results/")
+    #mkdir(FLAGS.outroot + "/results/" + FLAGS.folder)
+
 
 #    LABEL_FILE = FLAGS.dataroot  +  
 #    print(LABEL_FILE)
@@ -47,12 +49,13 @@ def initialize(FLAGS, LABEL_FILE, GENE_EXPRESSION_FILE, LABEL_MATRIX_FILE, DRUG_
     cell_lines = pd.read_csv(GENE_EXPRESSION_FILE, index_col=0).T # need to normalize
     labels = pd.read_csv(LABEL_FILE, index_col=0)
     labels['cell_line'] = labels['cell_line'].astype(str)
-    labels['response'] = labels['auc']
-    print(labels.columns)
+
+#    labels['response'] = labels['auc']
     #Index(['drug', 'cosmic_id', 'cell_line', 'ln_ic50', 'auc', 'resistant',
     #   'sensitive', 'pair_fold', 'cl_fold', 'response'],
     #  dtype='object')
-    columns = ['drug','cosmic_id','cell_line', 'response', 'resistant', 'sensitive','cl_fold']
+    columns = ['drug','improve_id','cell_line', 'response', 'resistant', 'sensitive','cl_fold']
+
     labels = labels[columns]
     labels = labels.loc[labels['drug'].isin(drug_feats.index)] # use only cell lines with data
     labels = labels.loc[labels['cell_line'].isin(cell_lines.index)] # use only drugs with data
